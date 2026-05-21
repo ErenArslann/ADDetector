@@ -1,0 +1,1065 @@
+﻿#Requires -Version 5.1
+<#
+.SYNOPSIS
+    ADDetector v0.2 - SOC IAM Hygiene Dashboard
+.DESCRIPTION
+    DomainDiscovery.ps1 ile ayni klasorde olmali.
+    Calistir: .\MainForm.ps1
+    Gereksinim: RSAT (ActiveDirectory PS modulu)
+#>
+
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+[System.Windows.Forms.Application]::EnableVisualStyles()
+
+# ====================================================================
+# PALETTE & FONTS
+# ====================================================================
+$script:C = @{
+    BgDark      = [System.Drawing.Color]::FromArgb(18,  20,  26)
+    BgMid       = [System.Drawing.Color]::FromArgb(26,  29,  38)
+    BgCard      = [System.Drawing.Color]::FromArgb(34,  38,  52)
+    BgGrid      = [System.Drawing.Color]::FromArgb(22,  25,  34)
+    BgRowAlt    = [System.Drawing.Color]::FromArgb(28,  31,  43)
+    BgDetail    = [System.Drawing.Color]::FromArgb(30,  34,  46)
+    FgPrimary   = [System.Drawing.Color]::FromArgb(220, 225, 240)
+    FgSecondary = [System.Drawing.Color]::FromArgb(130, 140, 165)
+    FgMuted     = [System.Drawing.Color]::FromArgb(80,  90,  115)
+    AccentBlue  = [System.Drawing.Color]::FromArgb(64,  156, 255)
+    RiskCritical = [System.Drawing.Color]::FromArgb(255, 65,  65)
+    RiskHigh     = [System.Drawing.Color]::FromArgb(255, 145, 30)
+    RiskMedium   = [System.Drawing.Color]::FromArgb(255, 210, 50)
+    RiskLow      = [System.Drawing.Color]::FromArgb(80,  200, 120)
+    RiskSA       = [System.Drawing.Color]::FromArgb(100, 160, 255)
+    RiskDisabled = [System.Drawing.Color]::FromArgb(70,  75,  95)
+    RowCritical  = [System.Drawing.Color]::FromArgb(60,  20,  20)
+    RowHigh      = [System.Drawing.Color]::FromArgb(55,  32,  10)
+    RowMedium    = [System.Drawing.Color]::FromArgb(50,  44,  10)
+    RowSA        = [System.Drawing.Color]::FromArgb(18,  36,  60)
+    RowDisabled  = [System.Drawing.Color]::FromArgb(28,  28,  38)
+    Border       = [System.Drawing.Color]::FromArgb(48,  54,  72)
+    Splitter     = [System.Drawing.Color]::FromArgb(40,  45,  62)
+}
+
+$script:F = @{
+    UI      = New-Object System.Drawing.Font('Segoe UI', 9)
+    UIBold  = New-Object System.Drawing.Font('Segoe UI', 9,   [System.Drawing.FontStyle]::Bold)
+    UISm    = New-Object System.Drawing.Font('Segoe UI', 8)
+    Mono    = New-Object System.Drawing.Font('Consolas', 8.5)
+    CardVal = New-Object System.Drawing.Font('Segoe UI', 20,  [System.Drawing.FontStyle]::Bold)
+    CardLbl = New-Object System.Drawing.Font('Segoe UI', 7.5, [System.Drawing.FontStyle]::Bold)
+    Header  = New-Object System.Drawing.Font('Segoe UI', 10,  [System.Drawing.FontStyle]::Bold)
+}
+
+# ====================================================================
+# RISK ENGINE
+# ====================================================================
+# Detection patterns are loaded from config/detection-groups.json
+# via DetectionConfig.ps1 (dot-sourced below in module loader block).
+
+function Test-IsServiceAccount {
+    param($r)
+    if ($r.SPNCount -gt 0)                                           { return $true }
+    if ($r.Description -match 'service|automated|system account')    { return $true }
+    # samAccountName regex from config (serviceAccount category)
+    $cfg = Get-DetectionConfig
+    $saCat = $cfg.patterns.serviceAccount
+    if ($saCat -and $saCat.isEnabled -and $saCat.regex) {
+        if ($r.SamAccountName -match $saCat.regex) { return $true }
+    }
+    return $false
+}
+
+function Test-IsPrivileged {
+    param($r)
+    if ($r.AdminCount -eq 1) { return $true }
+    if ($r.MatchedGroups -and $r.MatchedGroups.privileged -and $r.MatchedGroups.privileged.Count -gt 0) {
+        return $true
+    }
+    return $false
+}
+
+function Get-RiskScore {
+    param($r)
+    $s = 0
+    if     ($r.InactiveDays -ge 90) { $s += 70 }
+    elseif ($r.InactiveDays -ge 60) { $s += 55 }
+    elseif ($r.InactiveDays -ge 30) { $s += 40 }
+    if ($r.NeverLoggedIn)           { $s += 50 }
+    if     ($r.PwdAgeDays -ge 365)  { $s += 20 }
+    elseif ($r.PwdAgeDays -ge 180)  { $s += 10 }
+
+    # VPN / Remote Access boosters (dormant + remote = SOC red flag)
+    if ($r.HasVPNAccess)       { $s += 25 }
+    if ($r.HasRemoteAccess)    { $s += 20 }
+    if ($r.HasVPNAccess -and -not $r.HasMFA) { $s += 15 }   # VPN without MFA
+    if ($r.HasVPNAccess -and $r.NeverLoggedIn) { $s += 20 } # provisioned but never used
+
+    $mult = 1.0
+    if ($r.AdminCount -eq 1) { $mult = [Math]::Max($mult, 2.0) }
+    if ($r.IsPrivileged)     { $mult = [Math]::Max($mult, 2.5) }
+    if ($r.IsPrivileged -and ($r.HasVPNAccess -or $r.HasRemoteAccess)) {
+        $mult = [Math]::Max($mult, 3.0)                     # privileged + remote = CRITICAL
+    }
+    $s = [int]($s * $mult)
+    if (-not $r.Enabled)         { $s = [int]($s * 0.3) }
+    if ($r.IsServiceAccount)     { $s = [int]($s * 0.5) }
+    return [Math]::Min($s, 100)
+}
+
+function Get-RiskLevel {
+    param([int]$Score, [bool]$IsSA, [bool]$Disabled)
+    if ($Disabled) { return 'DISABLED'  }
+    if ($IsSA)     { return 'SVC-ACCT'  }
+    if ($Score -ge 80) { return 'CRITICAL' }
+    if ($Score -ge 55) { return 'HIGH'     }
+    if ($Score -ge 30) { return 'MEDIUM'   }
+    return 'LOW'
+}
+
+function Get-RiskOrder { param([string]$L)
+    switch ($L) {
+        'CRITICAL' { 0 } 'HIGH' { 1 } 'MEDIUM' { 2 }
+        'LOW'      { 3 } 'SVC-ACCT' { 4 } 'DISABLED' { 5 } default { 9 }
+    }
+}
+
+function Get-RiskColor { param([string]$L)
+    switch ($L) {
+        'CRITICAL' { $C.RiskCritical } 'HIGH'     { $C.RiskHigh    }
+        'MEDIUM'   { $C.RiskMedium   } 'LOW'      { $C.RiskLow     }
+        'SVC-ACCT' { $C.RiskSA       } 'DISABLED' { $C.RiskDisabled}
+        default    { $C.FgSecondary  }
+    }
+}
+
+function Get-RowBg { param([string]$L)
+    switch ($L) {
+        'CRITICAL' { $C.RowCritical } 'HIGH'     { $C.RowHigh    }
+        'MEDIUM'   { $C.RowMedium   } 'SVC-ACCT' { $C.RowSA      }
+        'DISABLED' { $C.RowDisabled } default    { $C.BgGrid     }
+    }
+}
+
+# ====================================================================
+# DomainDiscovery yukle
+# ====================================================================
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ddPath    = Join-Path $scriptDir 'DomainDiscovery.ps1'
+if (-not (Test-Path $ddPath)) {
+    [System.Windows.Forms.MessageBox]::Show(
+        "DomainDiscovery.ps1 bulunamadi.`nAranan: $ddPath",
+        'ADDetector','OK','Error')
+    exit 1
+}
+. $ddPath *>&1 | Out-Null
+
+# ====================================================================
+# DetectionConfig yukle (modules/DetectionConfig.ps1)
+# ====================================================================
+$dcPath = Join-Path $scriptDir 'modules\DetectionConfig.ps1'
+if (-not (Test-Path $dcPath)) {
+    [System.Windows.Forms.MessageBox]::Show(
+        "DetectionConfig.ps1 bulunamadi.`nAranan: $dcPath",
+        'ADDetector','OK','Error')
+    exit 1
+}
+. $dcPath
+$cfgPath = Join-Path $scriptDir 'config\detection-groups.json'
+Initialize-DetectionConfig -Path $cfgPath | Out-Null
+
+# ====================================================================
+# FORM
+# ====================================================================
+$form               = New-Object System.Windows.Forms.Form
+$form.Text          = 'ADDetector  v0.2  -  IAM Hygiene Dashboard'
+$form.Size          = New-Object System.Drawing.Size(1800, 880)
+$form.MinimumSize   = New-Object System.Drawing.Size(1680, 720)
+$form.StartPosition = 'CenterScreen'
+$form.BackColor     = $C.BgDark
+$form.Font          = $F.UI
+$form.ForeColor     = $C.FgPrimary
+
+# ?? TOP BAR ??????????????????????????????????????????????????????????????????
+$topBar           = New-Object System.Windows.Forms.Panel
+$topBar.Dock      = 'Top'
+$topBar.Height    = 52
+$topBar.BackColor = $C.BgMid
+
+$lblTitle         = New-Object System.Windows.Forms.Label
+$lblTitle.Text    = 'ADDetector'
+$lblTitle.Font    = New-Object System.Drawing.Font('Segoe UI', 14, [System.Drawing.FontStyle]::Bold)
+$lblTitle.ForeColor = $C.AccentBlue
+$lblTitle.AutoSize  = $true
+$lblTitle.Location  = New-Object System.Drawing.Point(14, 12)
+
+$lblSub           = New-Object System.Windows.Forms.Label
+$lblSub.Text      = 'IAM Hygiene Dashboard'
+$lblSub.Font      = $F.UISm
+$lblSub.ForeColor = $C.FgSecondary
+$lblSub.AutoSize  = $true
+$lblSub.Location  = New-Object System.Drawing.Point(145, 18)
+
+$lblDomLbl        = New-Object System.Windows.Forms.Label
+$lblDomLbl.Text   = 'DOMAIN'
+$lblDomLbl.Font   = $F.CardLbl
+$lblDomLbl.ForeColor = $C.FgMuted
+$lblDomLbl.AutoSize  = $true
+$lblDomLbl.Location  = New-Object System.Drawing.Point(315, 8)
+
+$cboDomain             = New-Object System.Windows.Forms.ComboBox
+$cboDomain.Location    = New-Object System.Drawing.Point(315, 24)
+$cboDomain.Size        = New-Object System.Drawing.Size(240, 22)
+$cboDomain.DropDownStyle = 'DropDownList'
+$cboDomain.FlatStyle   = 'Flat'
+$cboDomain.BackColor   = $C.BgCard
+$cboDomain.ForeColor   = $C.FgPrimary
+
+$lblManLbl        = New-Object System.Windows.Forms.Label
+$lblManLbl.Text   = 'MANUEL'
+$lblManLbl.Font   = $F.CardLbl
+$lblManLbl.ForeColor = $C.FgMuted
+$lblManLbl.AutoSize  = $true
+$lblManLbl.Location  = New-Object System.Drawing.Point(572, 8)
+
+$txtManual        = New-Object System.Windows.Forms.TextBox
+$txtManual.Location = New-Object System.Drawing.Point(572, 24)
+$txtManual.Size     = New-Object System.Drawing.Size(155, 22)
+$txtManual.BackColor = $C.BgCard
+$txtManual.ForeColor = $C.FgPrimary
+$txtManual.BorderStyle = 'FixedSingle'
+
+function New-Btn {
+    param([string]$Text, [int]$X, [System.Drawing.Color]$Bg, [int]$W = 92)
+    $b = New-Object System.Windows.Forms.Button
+    $b.Text = $Text; $b.Location = New-Object System.Drawing.Point($X, 13)
+    $b.Size = New-Object System.Drawing.Size($W, 26)
+    $b.FlatStyle = 'Flat'; $b.BackColor = $Bg
+    $b.ForeColor = [System.Drawing.Color]::White; $b.Font = $F.UIBold
+    $b.FlatAppearance.BorderSize = 0
+    return $b
+}
+
+$btnDiscover = New-Btn 'DISCOVER' 744  ([System.Drawing.Color]::FromArgb(0,122,204))
+$btnScan     = New-Btn 'SCAN'     844  ([System.Drawing.Color]::FromArgb(0,155,70))
+$btnScan.Enabled = $false
+$btnClear    = New-Btn 'CLEAR'    944  ([System.Drawing.Color]::FromArgb(75,80,110)) 72
+$btnCSV      = New-Btn 'CSV'      1024 ([System.Drawing.Color]::FromArgb(90, 110, 150)) 60
+$btnXLSX     = New-Btn 'XLSX'     1092 ([System.Drawing.Color]::FromArgb(40, 130, 90))  68
+$btnCSV.Enabled  = $false
+$btnXLSX.Enabled = $false
+
+$topBar.Controls.AddRange(@($lblTitle,$lblSub,$lblDomLbl,$cboDomain,$lblManLbl,$txtManual,$btnDiscover,$btnScan,$btnClear,$btnCSV,$btnXLSX))
+
+# ?? METRIC CARDS ?????????????????????????????????????????????????????????????
+$cardBar          = New-Object System.Windows.Forms.Panel
+$cardBar.Dock     = 'Top'
+$cardBar.Height   = 92
+$cardBar.BackColor = $C.BgDark
+
+$script:metricLabels = @{}
+
+$cardDefs = @(
+    @{Key='Total';      Lbl='Total Users';        Accent=$C.AccentBlue;    X=10  }
+    @{Key='Inactive';   Lbl='Inactive / Stale';   Accent=$C.RiskMedium;    X=193 }
+    @{Key='Critical';   Lbl='Critical Risk';       Accent=$C.RiskCritical;  X=376 }
+    @{Key='Privileged'; Lbl='Privileged Inactive'; Accent=$C.RiskHigh;      X=559 }
+    @{Key='NeverLogon'; Lbl='Never Logged In';     Accent=$C.RiskCritical;  X=742 }
+    @{Key='SvcAcc';     Lbl='Service Accounts';    Accent=$C.RiskSA;        X=925 }
+    @{Key='Disabled';   Lbl='Disabled Stale';      Accent=$C.RiskDisabled;  X=1108}
+    @{Key='RemoteAcc';  Lbl='Remote Access';       Accent=$C.RiskHigh;      X=1291}
+    @{Key='DormantVPN'; Lbl='Dormant VPN Users';   Accent=$C.RiskCritical;  X=1474}
+)
+
+foreach ($cd in $cardDefs) {
+    $card           = New-Object System.Windows.Forms.Panel
+    $card.Location  = New-Object System.Drawing.Point($cd.X, 8)
+    $card.Size      = New-Object System.Drawing.Size(175, 76)
+    $card.BackColor = $C.BgCard
+
+    $accentBar      = New-Object System.Windows.Forms.Panel
+    $accentBar.Location = New-Object System.Drawing.Point(0, 0)
+    $accentBar.Size     = New-Object System.Drawing.Size(4, 76)
+    $accentBar.BackColor = $cd.Accent
+
+    $valLbl         = New-Object System.Windows.Forms.Label
+    $valLbl.Text    = '-'
+    $valLbl.Font    = $F.CardVal
+    $valLbl.ForeColor = $C.FgPrimary
+    $valLbl.AutoSize  = $true
+    $valLbl.Location  = New-Object System.Drawing.Point(14, 11)
+
+    $keyLbl         = New-Object System.Windows.Forms.Label
+    $keyLbl.Text    = $cd.Lbl.ToUpper()
+    $keyLbl.Font    = $F.CardLbl
+    $keyLbl.ForeColor = $cd.Accent
+    $keyLbl.AutoSize  = $true
+    $keyLbl.Location  = New-Object System.Drawing.Point(14, 54)
+
+    $card.Controls.AddRange(@($accentBar, $valLbl, $keyLbl))
+    $cardBar.Controls.Add($card)
+    $script:metricLabels[$cd.Key] = $valLbl
+}
+
+# ?? FILTER BAR ???????????????????????????????????????????????????????????????
+$filterBar        = New-Object System.Windows.Forms.Panel
+$filterBar.Dock   = 'Top'
+$filterBar.Height = 36
+$filterBar.BackColor = $C.BgMid
+
+$cboRisk          = New-Object System.Windows.Forms.ComboBox
+$cboRisk.Location = New-Object System.Drawing.Point(12, 7)
+$cboRisk.Size     = New-Object System.Drawing.Size(128, 22)
+$cboRisk.DropDownStyle = 'DropDownList'
+$cboRisk.FlatStyle     = 'Flat'
+$cboRisk.BackColor     = $C.BgCard
+$cboRisk.ForeColor     = $C.FgPrimary
+@('All Risk Levels','CRITICAL','HIGH','MEDIUM','LOW','SVC-ACCT','DISABLED') |
+    ForEach-Object { [void]$cboRisk.Items.Add($_) }
+$cboRisk.SelectedIndex = 0
+
+function New-Chk {
+    param([string]$Text, [int]$X)
+    $c = New-Object System.Windows.Forms.CheckBox
+    $c.Text = $Text; $c.Font = $script:F.UISm
+    $c.ForeColor = $script:C.FgSecondary
+    $c.BackColor = [System.Drawing.Color]::Transparent
+    $c.AutoSize  = $true
+    $c.Location  = New-Object System.Drawing.Point($X, 9)
+    return $c
+}
+
+$chkPrivOnly  = New-Chk 'Privileged only'    152
+$chkNeverOnly = New-Chk 'Never logged in'    280
+$chkHideSA    = New-Chk 'Hide svc accts'     408
+$chkHideDis   = New-Chk 'Hide disabled'      533
+$chkVPNOnly   = New-Chk 'VPN/MFA only'       650
+$chkRAOnly    = New-Chk 'Remote access only' 750
+
+$lblSrch      = New-Object System.Windows.Forms.Label
+$lblSrch.Text = 'SEARCH'
+$lblSrch.Font = $F.CardLbl
+$lblSrch.ForeColor = $C.FgMuted
+$lblSrch.AutoSize  = $true
+$lblSrch.Location  = New-Object System.Drawing.Point(890, 12)
+
+$txtSearch         = New-Object System.Windows.Forms.TextBox
+$txtSearch.Location = New-Object System.Drawing.Point(942, 7)
+$txtSearch.Size     = New-Object System.Drawing.Size(220, 22)
+$txtSearch.BackColor = $C.BgCard
+$txtSearch.ForeColor = $C.FgPrimary
+$txtSearch.BorderStyle = 'FixedSingle'
+
+$filterBar.Controls.AddRange(@($cboRisk,$chkPrivOnly,$chkNeverOnly,$chkHideSA,$chkHideDis,$chkVPNOnly,$chkRAOnly,$lblSrch,$txtSearch))
+
+# ?? STATUS BAR ???????????????????????????????????????????????????????????????
+$statusBar        = New-Object System.Windows.Forms.StatusStrip
+$statusBar.BackColor = $C.BgMid
+$statusBar.SizingGrip = $false
+$statusLabel      = New-Object System.Windows.Forms.ToolStripStatusLabel
+$statusLabel.Text     = 'Ready  -  Click DISCOVER to load domains.'
+$statusLabel.Spring   = $true
+$statusLabel.TextAlign = 'MiddleLeft'
+$statusLabel.ForeColor = $C.FgSecondary
+$progBar          = New-Object System.Windows.Forms.ToolStripProgressBar
+$progBar.Width    = 150
+$progBar.Visible  = $false
+$statusBar.Items.AddRange(@($statusLabel,$progBar))
+
+# ?? MAIN SPLIT ???????????????????????????????????????????????????????????????
+# IMPORTANT: Panel1MinSize + Panel2MinSize SplitterDistance'tan ONCE atanmali.
+# SplitterDistance form Shown event'inde set edilir (final width belli oldugunda).
+$mainSplit                  = New-Object System.Windows.Forms.SplitContainer
+$mainSplit.Dock             = 'Fill'
+$mainSplit.Panel1MinSize    = 620
+$mainSplit.Panel2MinSize    = 290
+$mainSplit.BackColor        = $script:C.Splitter
+
+# Grid
+$grid                              = New-Object System.Windows.Forms.DataGridView
+$grid.Dock                         = 'Fill'
+$grid.ReadOnly                     = $true
+$grid.AllowUserToAddRows           = $false
+$grid.AllowUserToDeleteRows        = $false
+$grid.MultiSelect                  = $false
+$grid.SelectionMode                = 'FullRowSelect'
+$grid.BackgroundColor              = $C.BgGrid
+$grid.GridColor                    = $C.Border
+$grid.BorderStyle                  = 'None'
+$grid.RowHeadersVisible            = $false
+$grid.AutoSizeColumnsMode          = 'None'
+$grid.EnableHeadersVisualStyles    = $false
+$grid.ColumnHeadersHeight          = 30
+$grid.RowTemplate.Height           = 24
+$grid.Font                         = $F.UISm
+$grid.ForeColor                    = $C.FgPrimary
+$grid.DefaultCellStyle.BackColor   = $C.BgGrid
+$grid.DefaultCellStyle.ForeColor   = $C.FgPrimary
+$grid.DefaultCellStyle.SelectionBackColor = [System.Drawing.Color]::FromArgb(50,90,160)
+$grid.DefaultCellStyle.SelectionForeColor = [System.Drawing.Color]::White
+$grid.AlternatingRowsDefaultCellStyle.BackColor = $C.BgRowAlt
+$grid.ColumnHeadersDefaultCellStyle.BackColor   = $C.BgMid
+$grid.ColumnHeadersDefaultCellStyle.ForeColor   = $C.FgSecondary
+$grid.ColumnHeadersDefaultCellStyle.Font        = $F.UIBold
+$grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = $C.BgMid
+
+$lblEmpty         = New-Object System.Windows.Forms.Label
+$lblEmpty.Text    = "No data - Run a scan first."
+$lblEmpty.Dock    = 'Fill'
+$lblEmpty.TextAlign = 'MiddleCenter'
+$lblEmpty.Font    = New-Object System.Drawing.Font('Segoe UI', 13)
+$lblEmpty.ForeColor = $C.FgMuted
+$lblEmpty.BackColor = $C.BgGrid
+$lblEmpty.Visible   = $true
+
+$mainSplit.Panel1.BackColor = $C.BgGrid
+$mainSplit.Panel1.Controls.AddRange(@($grid, $lblEmpty))
+
+# Detail Panel
+$detailOuter      = New-Object System.Windows.Forms.Panel
+$detailOuter.Dock = 'Fill'
+$detailOuter.BackColor = $C.BgDetail
+$detailOuter.Padding   = New-Object System.Windows.Forms.Padding(0)
+
+$lblDetailHdr     = New-Object System.Windows.Forms.Label
+$lblDetailHdr.Text    = 'ACCOUNT DETAIL'
+$lblDetailHdr.Dock    = 'Top'
+$lblDetailHdr.Height  = 28
+$lblDetailHdr.Font    = $F.Header
+$lblDetailHdr.ForeColor = $C.AccentBlue
+$lblDetailHdr.BackColor = $C.BgMid
+$lblDetailHdr.TextAlign = 'MiddleLeft'
+$lblDetailHdr.Padding   = New-Object System.Windows.Forms.Padding(10,0,0,0)
+
+$txtDetail        = New-Object System.Windows.Forms.RichTextBox
+$txtDetail.Dock   = 'Fill'
+$txtDetail.ReadOnly = $true
+$txtDetail.BackColor = $C.BgDetail
+$txtDetail.ForeColor = $C.FgPrimary
+$txtDetail.Font   = $F.Mono
+$txtDetail.BorderStyle = 'None'
+$txtDetail.Text   = "Select a user to view details."
+$txtDetail.ScrollBars = 'Vertical'
+
+$detailOuter.Controls.AddRange(@($txtDetail, $lblDetailHdr))
+$mainSplit.Panel2.Controls.Add($detailOuter)
+
+# ?? FORM ASSEMBLY (Dock order: Fill must be added first to Controls, appears last visually) ?
+$form.Controls.Add($statusBar)
+$form.Controls.Add($mainSplit)
+$form.Controls.Add($filterBar)
+$form.Controls.Add($cardBar)
+$form.Controls.Add($topBar)
+
+# ====================================================================
+# STATE
+# ====================================================================
+$script:domains      = @()
+$script:allRows      = @()
+$script:filteredRows = @()
+
+# ====================================================================
+# HELPERS
+# ====================================================================
+function Set-Status {
+    param([string]$Text, [bool]$Progress = $false)
+    $statusLabel.Text = $Text
+    $progBar.Visible  = $Progress
+    [System.Windows.Forms.Application]::DoEvents()
+}
+
+function Set-Card { param([string]$Key, [int]$Val)
+    if ($script:metricLabels.ContainsKey($Key)) { $script:metricLabels[$Key].Text = $Val.ToString() }
+}
+
+function Reset-Cards {
+    foreach ($k in $script:metricLabels.Keys) { $script:metricLabels[$k].Text = '-' }
+}
+
+# ====================================================================
+# GRID COLUMNS
+# ====================================================================
+function Initialize-Columns {
+    $grid.Columns.Clear()
+    $defs = @(
+        @{N='RiskLevel';       H='Risk';         W=72  }
+        @{N='RiskScore';       H='Score';        W=55  }
+        @{N='SamAccountName';  H='Username';     W=130 }
+        @{N='DisplayName';     H='Display Name'; W=148 }
+        @{N='AccountType';     H='Type';         W=82  }
+        @{N='InactiveDays';    H='Inactive Days';W=100 }
+        @{N='LastLogon';       H='Last Logon';   W=105 }
+        @{N='VPN';             H='VPN';          W=50  }
+        @{N='MFA';             H='MFA';          W=50  }
+        @{N='RemoteAcc';       H='RemoteAcc';    W=78  }
+        @{N='VPNRisk';         H='VPN Risk';     W=78  }
+        @{N='PwdAgeDays';      H='Pwd Age (d)';  W=90  }
+        @{N='Department';      H='Department';   W=115 }
+        @{N='Enabled';         H='Enabled';      W=62  }
+        @{N='AdminCount';      H='AdminCnt';     W=72  }
+        @{N='WhenCreated';     H='Created';      W=98  }
+        @{N='Mail';            H='Mail';         W=160 }
+    )
+    foreach ($d in $defs) {
+        $col = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+        $col.Name = $d.N; $col.HeaderText = $d.H; $col.Width = $d.W
+        $col.SortMode = 'Automatic'
+        $col.DefaultCellStyle.Padding = New-Object System.Windows.Forms.Padding(4,0,4,0)
+        [void]$grid.Columns.Add($col)
+    }
+}
+
+# ====================================================================
+# BUILD ROW OBJECT
+# ====================================================================
+function New-UserRow {
+    param($u, [datetime]$Now)
+    $neverLogon  = ($u.LastLogonDate -eq $null)
+    $inactiveDays = if ($neverLogon) { [int]($Now - $u.WhenCreated).TotalDays }
+                    else             { [int]($Now - $u.LastLogonDate).TotalDays }
+    $pwdAge = if ($u.PasswordLastSet) { [int]($Now - $u.PasswordLastSet).TotalDays } else { 9999 }
+
+    $memberOfFlat = @()
+    if ($u.MemberOf) {
+        $memberOfFlat = @($u.MemberOf | ForEach-Object {
+            if ($_ -match '^CN=([^,]+)') { $Matches[1] } else { $_ }
+        })
+    }
+
+    $spnCount = if ($u.ServicePrincipalName) { $u.ServicePrincipalName.Count } else { 0 }
+
+    $r = [PSCustomObject]@{
+        SamAccountName    = $u.SamAccountName
+        DisplayName       = $u.DisplayName
+        Enabled           = $u.Enabled
+        Department        = $u.Department
+        Mail              = $u.Mail
+        Description       = $u.Description
+        DistinguishedName = $u.DistinguishedName
+        AdminCount        = $u.AdminCount
+        SPNCount          = $spnCount
+        WhenCreated       = if ($u.WhenCreated)    { $u.WhenCreated.ToString('yyyy-MM-dd')    } else { '-' }
+        LastLogon         = if ($neverLogon)        { 'NEVER' }
+                            else                    { $u.LastLogonDate.ToString('yyyy-MM-dd') }
+        PwdLastSet        = if ($u.PasswordLastSet) { $u.PasswordLastSet.ToString('yyyy-MM-dd') } else { 'NEVER SET' }
+        PwdAgeDays        = $pwdAge
+        InactiveDays      = $inactiveDays
+        NeverLoggedIn     = $neverLogon
+        MemberOfFlat      = $memberOfFlat
+        MatchedGroups     = @{ vpn=@(); mfa=@(); remoteAccess=@(); privileged=@(); serviceAccount=@() }
+        IsServiceAccount  = $false
+        IsPrivileged      = $false
+        AccountType       = 'User'
+        RiskScore         = 0
+        RiskLevel         = 'LOW'
+        HasVPNAccess      = $false
+        HasMFA            = $false
+        HasRemoteAccess   = $false
+        VPNGroups         = @()
+        MFAGroups         = @()
+        RAGroups          = @()
+        VPNRisk           = 'NONE'
+    }
+
+    # Config-driven group matching (groups exact > regex fallback, isEnabled gated)
+    $matched = Get-MatchedGroupsByCategory -MemberOfFlat $memberOfFlat
+    $r.MatchedGroups   = $matched
+    $r.VPNGroups       = @($matched.vpn)
+    $r.MFAGroups       = @($matched.mfa)
+    $r.RAGroups        = @($matched.remoteAccess)
+    $r.HasVPNAccess    = ($r.VPNGroups.Count -gt 0)
+    $r.HasMFA          = ($r.MFAGroups.Count -gt 0)
+    $r.HasRemoteAccess = ($r.RAGroups.Count  -gt 0)
+
+    $r.IsServiceAccount = Test-IsServiceAccount $r
+    $r.IsPrivileged     = Test-IsPrivileged     $r
+    $r.AccountType      = if ($r.IsServiceAccount) { 'Svc Acct' }
+                          elseif ($r.IsPrivileged)  { 'Privileged' }
+                          else                      { 'User' }
+
+    # VPNRisk: dormant + remote access capability classification
+    $r.VPNRisk = if ($r.HasVPNAccess -and $r.NeverLoggedIn)              { 'CRITICAL' }
+                 elseif ($r.HasVPNAccess -and -not $r.HasMFA)            { 'HIGH'     }
+                 elseif ($r.HasVPNAccess -and $r.InactiveDays -ge 60)    { 'HIGH'     }
+                 elseif ($r.HasVPNAccess -or $r.HasRemoteAccess)         { 'MEDIUM'   }
+                 else                                                    { 'NONE'     }
+
+    $r.RiskScore = Get-RiskScore $r
+    $r.RiskLevel = Get-RiskLevel -Score $r.RiskScore -IsSA $r.IsServiceAccount -Disabled (-not $r.Enabled)
+    return $r
+}
+
+# ====================================================================
+# POPULATE GRID
+# ====================================================================
+function Update-Grid {
+    $grid.SuspendLayout()
+    $grid.Rows.Clear()
+
+    $sorted = $script:filteredRows | Sort-Object { Get-RiskOrder $_.RiskLevel }, { -[int]$_.RiskScore }
+
+    foreach ($r in $sorted) {
+        $vpnTxt = if ($r.HasVPNAccess)    { 'YES' } else { '-' }
+        $mfaTxt = if ($r.HasMFA)          { 'YES' } else { '-' }
+        $raTxt  = if ($r.HasRemoteAccess) { 'YES' } else { '-' }
+
+        $idx = $grid.Rows.Add(
+            $r.RiskLevel, $r.RiskScore, $r.SamAccountName, $r.DisplayName,
+            $r.AccountType, $r.InactiveDays, $r.LastLogon,
+            $vpnTxt, $mfaTxt, $raTxt, $r.VPNRisk,
+            $r.PwdAgeDays, $r.Department, $(if ($r.Enabled) {'Yes'} else {'No'}),
+            $r.AdminCount, $r.WhenCreated, $r.Mail
+        )
+        $row = $grid.Rows[$idx]
+        $row.DefaultCellStyle.BackColor = Get-RowBg $r.RiskLevel
+        $row.DefaultCellStyle.ForeColor = $C.FgPrimary
+        $row.Cells['RiskLevel'].Style.ForeColor = Get-RiskColor $r.RiskLevel
+        $row.Cells['RiskLevel'].Style.Font      = $F.UIBold
+        $scoreColor = if ($r.RiskScore -ge 80) { $C.RiskCritical }
+                      elseif ($r.RiskScore -ge 55) { $C.RiskHigh }
+                      elseif ($r.RiskScore -ge 30) { $C.RiskMedium }
+                      else { $C.RiskLow }
+        $row.Cells['RiskScore'].Style.ForeColor = $scoreColor
+
+        # VPN / MFA / RemoteAcc badge colors
+        if ($r.HasVPNAccess) {
+            $row.Cells['VPN'].Style.ForeColor = $C.RiskHigh
+            $row.Cells['VPN'].Style.Font      = $F.UIBold
+        } else { $row.Cells['VPN'].Style.ForeColor = $C.FgMuted }
+
+        if ($r.HasMFA) {
+            $row.Cells['MFA'].Style.ForeColor = $C.RiskLow
+            $row.Cells['MFA'].Style.Font      = $F.UIBold
+        } elseif ($r.HasVPNAccess) {
+            $row.Cells['MFA'].Style.ForeColor = $C.RiskCritical  # VPN without MFA
+            $row.Cells['MFA'].Style.Font      = $F.UIBold
+        } else { $row.Cells['MFA'].Style.ForeColor = $C.FgMuted }
+
+        if ($r.HasRemoteAccess) {
+            $row.Cells['RemoteAcc'].Style.ForeColor = $C.RiskHigh
+            $row.Cells['RemoteAcc'].Style.Font      = $F.UIBold
+        } else { $row.Cells['RemoteAcc'].Style.ForeColor = $C.FgMuted }
+
+        $vpnRiskColor = switch ($r.VPNRisk) {
+            'CRITICAL' { $C.RiskCritical }
+            'HIGH'     { $C.RiskHigh     }
+            'MEDIUM'   { $C.RiskMedium   }
+            default    { $C.FgMuted      }
+        }
+        $row.Cells['VPNRisk'].Style.ForeColor = $vpnRiskColor
+        if ($r.VPNRisk -ne 'NONE') { $row.Cells['VPNRisk'].Style.Font = $F.UIBold }
+
+        $row.Tag = $r
+    }
+
+    $lblEmpty.Visible = ($grid.Rows.Count -eq 0)
+    $grid.ResumeLayout()
+}
+
+# ====================================================================
+# FILTER
+# ====================================================================
+function Apply-Filters {
+    $rf     = $cboRisk.SelectedItem
+    $srch   = $txtSearch.Text.Trim().ToLower()
+
+    $script:filteredRows = $script:allRows | Where-Object {
+        $r = $_
+        if ($rf -ne 'All Risk Levels' -and $r.RiskLevel -ne $rf) { return $false }
+        if ($chkPrivOnly.Checked  -and -not $r.IsPrivileged)     { return $false }
+        if ($chkNeverOnly.Checked -and -not $r.NeverLoggedIn)    { return $false }
+        if ($chkHideSA.Checked    -and $r.IsServiceAccount)      { return $false }
+        if ($chkHideDis.Checked   -and -not $r.Enabled)          { return $false }
+        if ($chkVPNOnly.Checked   -and -not ($r.HasVPNAccess -or $r.HasMFA)) { return $false }
+        if ($chkRAOnly.Checked    -and -not $r.HasRemoteAccess)  { return $false }
+        if ($srch) {
+            $hay = "$($r.SamAccountName) $($r.DisplayName) $($r.Department) $($r.Mail) $($r.DistinguishedName)".ToLower()
+            if ($hay -notlike "*$srch*") { return $false }
+        }
+        return $true
+    }
+    Update-Grid
+    Set-Status "Showing $($script:filteredRows.Count) of $($script:allRows.Count) accounts"
+}
+
+# ====================================================================
+# EXPORT
+# ====================================================================
+function Get-WhyFlagged {
+    param($r)
+    $w = @()
+    if ($r.NeverLoggedIn)            { $w += 'NeverLogon' }
+    if ($r.InactiveDays -ge 90)      { $w += "Inactive$($r.InactiveDays)d" }
+    elseif ($r.InactiveDays -ge 60)  { $w += "Inactive$($r.InactiveDays)d" }
+    elseif ($r.InactiveDays -ge 30)  { $w += "Inactive$($r.InactiveDays)d" }
+    if ($r.PwdAgeDays -ge 365)       { $w += "PwdAge$($r.PwdAgeDays)d" }
+    elseif ($r.PwdAgeDays -ge 180)   { $w += "PwdAge$($r.PwdAgeDays)d" }
+    if ($r.IsPrivileged)             { $w += 'Privileged' }
+    if ($r.AdminCount -eq 1)         { $w += 'AdminCount=1' }
+    if ($r.HasVPNAccess)             { $w += 'VPN' }
+    if ($r.HasRemoteAccess)          { $w += 'RemoteAcc' }
+    if ($r.HasVPNAccess -and -not $r.HasMFA) { $w += 'VPN-NoMFA' }
+    if ($r.IsServiceAccount)         { $w += 'SvcAcct' }
+    if (-not $r.Enabled)             { $w += 'Disabled' }
+    if ($w.Count -eq 0) { return 'LowRisk' }
+    return ($w -join '; ')
+}
+
+function ConvertTo-ExportRow {
+    param($r)
+    return [PSCustomObject][ordered]@{
+        RiskLevel    = $r.RiskLevel
+        RiskScore    = $r.RiskScore
+        Username     = $r.SamAccountName
+        DisplayName  = $r.DisplayName
+        AccountType  = $r.AccountType
+        InactiveDays = $r.InactiveDays
+        LastLogon    = $r.LastLogon
+        VPN          = if ($r.HasVPNAccess)    { 'YES' } else { 'NO' }
+        MFA          = if ($r.HasMFA)          { 'YES' } else { 'NO' }
+        RemoteAccess = if ($r.HasRemoteAccess) { 'YES' } else { 'NO' }
+        VPNRisk      = $r.VPNRisk
+        PwdAgeDays   = $r.PwdAgeDays
+        Department   = $r.Department
+        Enabled      = if ($r.Enabled) { 'Yes' } else { 'No' }
+        AdminCount   = $r.AdminCount
+        Mail         = $r.Mail
+        WhyFlagged   = Get-WhyFlagged $r
+    }
+}
+
+function Get-CurrentFilteredView {
+    # Grid sort order: RiskOrder asc, RiskScore desc
+    $sorted = $script:filteredRows | Sort-Object { Get-RiskOrder $_.RiskLevel }, { -[int]$_.RiskScore }
+    return @($sorted | ForEach-Object { ConvertTo-ExportRow $_ })
+}
+
+function Get-ExportPath {
+    param([string]$Ext, [string]$Filter)
+    $dom = if ($cboDomain.SelectedItem) { ($cboDomain.SelectedItem -replace '[^\w\.-]','_') } else { 'export' }
+    $ts  = Get-Date -Format 'yyyyMMdd_HHmmss'
+    $sfd = New-Object System.Windows.Forms.SaveFileDialog
+    $sfd.Filter   = $Filter
+    $sfd.FileName = "ADDetector_${dom}_${ts}.$Ext"
+    $sfd.Title    = "Export $($Ext.ToUpper())"
+    if ($sfd.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return $null }
+    return $sfd.FileName
+}
+
+function Export-CSV-View {
+    if (-not $script:filteredRows -or $script:filteredRows.Count -eq 0) {
+        [System.Windows.Forms.MessageBox]::Show('No data to export.','ADDetector','OK','Information'); return
+    }
+    $path = Get-ExportPath 'csv' 'CSV (UTF-8 BOM)|*.csv'
+    if (-not $path) { return }
+    try {
+        Set-Status "Exporting CSV..." $true
+        $rows = Get-CurrentFilteredView
+        # UTF8 BOM - Excel compatible
+        $enc = New-Object System.Text.UTF8Encoding($true)
+        $csv = $rows | ConvertTo-Csv -NoTypeInformation -Delimiter ','
+        [System.IO.File]::WriteAllLines($path, $csv, $enc)
+        Set-Status "CSV exported: $path  ($($rows.Count) rows)"
+        [System.Windows.Forms.MessageBox]::Show("Exported $($rows.Count) rows.`n$path",'Export CSV','OK','Information')
+    } catch {
+        Set-Status "CSV export error: $_"
+        [System.Windows.Forms.MessageBox]::Show("Export error:`n$_",'ADDetector','OK','Error')
+    } finally {
+        $progBar.Visible = $false
+    }
+}
+
+function Export-XLSX-View {
+    if (-not $script:filteredRows -or $script:filteredRows.Count -eq 0) {
+        [System.Windows.Forms.MessageBox]::Show('No data to export.','ADDetector','OK','Information'); return
+    }
+    if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
+        $msg = "ImportExcel module not found.`n`nInstall:`n  Install-Module ImportExcel -Scope CurrentUser`n`nFallback to CSV?"
+        $r = [System.Windows.Forms.MessageBox]::Show($msg,'ADDetector','YesNo','Question')
+        if ($r -eq [System.Windows.Forms.DialogResult]::Yes) { Export-CSV-View }
+        return
+    }
+    $path = Get-ExportPath 'xlsx' 'Excel Workbook|*.xlsx'
+    if (-not $path) { return }
+    try {
+        Set-Status "Exporting XLSX..." $true
+        Import-Module ImportExcel -ErrorAction Stop
+        $rows = Get-CurrentFilteredView
+        if (Test-Path $path) { Remove-Item $path -Force }
+
+        $excel = $rows | Export-Excel -Path $path -WorksheetName 'ADDetector' `
+                    -AutoSize -AutoFilter -FreezeTopRow -BoldTopRow `
+                    -TableName 'ADDetector' -TableStyle 'Medium2' `
+                    -PassThru
+        $ws = $excel.Workbook.Worksheets['ADDetector']
+
+        # Risk-based row coloring (basic)
+        $lastRow = $ws.Dimension.End.Row
+        $lastCol = $ws.Dimension.End.Column
+        $riskColIdx = 1  # RiskLevel is first column
+
+        for ($i = 2; $i -le $lastRow; $i++) {
+            $lvl = $ws.Cells[$i, $riskColIdx].Value
+            $bg = switch ($lvl) {
+                'CRITICAL' { [System.Drawing.Color]::FromArgb(255,200,200) }
+                'HIGH'     { [System.Drawing.Color]::FromArgb(255,225,180) }
+                'MEDIUM'   { [System.Drawing.Color]::FromArgb(255,245,180) }
+                'SVC-ACCT' { [System.Drawing.Color]::FromArgb(210,225,250) }
+                'DISABLED' { [System.Drawing.Color]::FromArgb(225,225,225) }
+                default    { $null }
+            }
+            if ($bg) {
+                $range = $ws.Cells[$i, 1, $i, $lastCol]
+                $range.Style.Fill.PatternType = 'Solid'
+                $range.Style.Fill.BackgroundColor.SetColor($bg)
+            }
+        }
+        Close-ExcelPackage $excel
+
+        Set-Status "XLSX exported: $path  ($($rows.Count) rows)"
+        [System.Windows.Forms.MessageBox]::Show("Exported $($rows.Count) rows.`n$path",'Export XLSX','OK','Information')
+    } catch {
+        Set-Status "XLSX export error: $_"
+        [System.Windows.Forms.MessageBox]::Show("Export error:`n$_",'ADDetector','OK','Error')
+    } finally {
+        $progBar.Visible = $false
+    }
+}
+
+# ====================================================================
+# DETAIL PANEL
+# ====================================================================
+function Show-Detail {
+    param($r)
+    if (-not $r) { $txtDetail.Text = 'Select a user.'; return }
+    $sb = New-Object System.Text.StringBuilder
+
+    [void]$sb.AppendLine("=== IDENTITY ===================================")
+    [void]$sb.AppendLine("  Username   : $($r.SamAccountName)")
+    [void]$sb.AppendLine("  Display    : $($r.DisplayName)")
+    [void]$sb.AppendLine("  Mail       : $($r.Mail)")
+    [void]$sb.AppendLine("  Department : $($r.Department)")
+    [void]$sb.AppendLine("  Enabled    : $($r.Enabled)")
+    [void]$sb.AppendLine("  Desc       : $($r.Description)")
+    [void]$sb.AppendLine("")
+    [void]$sb.AppendLine("=== RISK ========================================")
+    [void]$sb.AppendLine("  Level      : $($r.RiskLevel)")
+    [void]$sb.AppendLine("  Score      : $($r.RiskScore) / 100")
+    [void]$sb.AppendLine("  Privileged : $($r.IsPrivileged)")
+    [void]$sb.AppendLine("  Svc Acct   : $($r.IsServiceAccount)")
+    [void]$sb.AppendLine("  AdminCount : $($r.AdminCount)")
+    [void]$sb.AppendLine("  SPN Count  : $($r.SPNCount)")
+    [void]$sb.AppendLine("")
+    [void]$sb.AppendLine("=== REMOTE ACCESS / MFA ========================")
+    [void]$sb.AppendLine("  VPN Access : $($r.HasVPNAccess)")
+    [void]$sb.AppendLine("  MFA Group  : $($r.HasMFA)")
+    [void]$sb.AppendLine("  Remote Acc : $($r.HasRemoteAccess)")
+    [void]$sb.AppendLine("  VPN Risk   : $($r.VPNRisk)")
+    if ($r.VPNGroups.Count -gt 0) {
+        [void]$sb.AppendLine("  VPN Groups :")
+        $r.VPNGroups | ForEach-Object { [void]$sb.AppendLine("    - $_") }
+    }
+    if ($r.MFAGroups.Count -gt 0) {
+        [void]$sb.AppendLine("  MFA Groups :")
+        $r.MFAGroups | ForEach-Object { [void]$sb.AppendLine("    - $_") }
+    }
+    if ($r.RAGroups.Count -gt 0) {
+        [void]$sb.AppendLine("  RA Groups  :")
+        $r.RAGroups  | ForEach-Object { [void]$sb.AppendLine("    - $_") }
+    }
+    [void]$sb.AppendLine("")
+    [void]$sb.AppendLine("=== LOGON / AGE ================================")
+    [void]$sb.AppendLine("  Last Logon : $($r.LastLogon)")
+    [void]$sb.AppendLine("  Inactive   : $($r.InactiveDays) days")
+    [void]$sb.AppendLine("  Never      : $($r.NeverLoggedIn)")
+    [void]$sb.AppendLine("  Pwd Set    : $($r.PwdLastSet)")
+    [void]$sb.AppendLine("  Pwd Age    : $($r.PwdAgeDays) days")
+    [void]$sb.AppendLine("  Created    : $($r.WhenCreated)")
+    [void]$sb.AppendLine("")
+    [void]$sb.AppendLine("=== DIRECTORY ==================================")
+    [void]$sb.AppendLine("  DN:")
+    [void]$sb.AppendLine("    $($r.DistinguishedName)")
+    [void]$sb.AppendLine("")
+    [void]$sb.AppendLine("=== RISK FACTORS ===============================")
+    $reasons = @()
+    if ($r.NeverLoggedIn)            { $reasons += '  [+50] Never logged in' }
+    if ($r.InactiveDays -ge 90)      { $reasons += "  [+70] $($r.InactiveDays)d inactive (>=90d)" }
+    elseif ($r.InactiveDays -ge 60)  { $reasons += "  [+55] $($r.InactiveDays)d inactive (>=60d)" }
+    elseif ($r.InactiveDays -ge 30)  { $reasons += "  [+40] $($r.InactiveDays)d inactive (>=30d)" }
+    if ($r.PwdAgeDays -ge 365)       { $reasons += '  [+20] Password age >= 365 days' }
+    elseif ($r.PwdAgeDays -ge 180)   { $reasons += '  [+10] Password age >= 180 days' }
+    if ($r.AdminCount -eq 1)         { $reasons += '  [x2.0] AdminCount = 1' }
+    if ($r.IsPrivileged)             { $reasons += '  [x2.5] Privileged group member' }
+    if ($r.HasVPNAccess)             { $reasons += '  [+25] Has VPN access' }
+    if ($r.HasRemoteAccess)          { $reasons += '  [+20] Has remote access (RDS/Citrix/RDGW)' }
+    if ($r.HasVPNAccess -and -not $r.HasMFA) { $reasons += '  [+15] VPN access WITHOUT MFA group' }
+    if ($r.HasVPNAccess -and $r.NeverLoggedIn) { $reasons += '  [+20] VPN provisioned but never used' }
+    if ($r.IsPrivileged -and ($r.HasVPNAccess -or $r.HasRemoteAccess)) {
+        $reasons += '  [x3.0] Privileged + Remote access (CRITICAL combo)'
+    }
+    if (-not $r.Enabled)             { $reasons += '  [x0.3] Disabled (score reducer)' }
+    if ($r.IsServiceAccount)         { $reasons += '  [x0.5] Service account (score reducer)' }
+    if ($reasons.Count -eq 0)       { [void]$sb.AppendLine('  No significant factors.') }
+    else { $reasons | ForEach-Object { [void]$sb.AppendLine($_) } }
+
+    if ($r.MemberOfFlat -and $r.MemberOfFlat.Count -gt 0) {
+        [void]$sb.AppendLine("")
+        [void]$sb.AppendLine("=== GROUPS ($($r.MemberOfFlat.Count)) =============================")
+        $r.MemberOfFlat | Select-Object -First 25 | ForEach-Object { [void]$sb.AppendLine("  $_") }
+        if ($r.MemberOfFlat.Count -gt 25) { [void]$sb.AppendLine("  ... +$($r.MemberOfFlat.Count - 25) more") }
+    }
+
+    $txtDetail.Text = $sb.ToString()
+}
+
+# ====================================================================
+# EVENTS
+# ====================================================================
+$btnDiscover.Add_Click({
+    $btnDiscover.Enabled = $false
+    $btnScan.Enabled     = $false
+    $cboDomain.Items.Clear()
+    Set-Status 'Discovering domains...' $true
+    try {
+        $manual = $txtManual.Text.Trim()
+        $script:domains = if ($manual) { @(Get-ManualDomainInfo -DomainFQDN $manual) }
+                          else          { Invoke-DomainDiscovery }
+        if (-not $script:domains -or $script:domains.Count -eq 0) {
+            Set-Status 'No domains found. Enter manually.'; return
+        }
+        foreach ($d in $script:domains) { [void]$cboDomain.Items.Add($d.DomainName) }
+        $cboDomain.SelectedIndex = 0
+        $btnScan.Enabled = $true
+        Set-Status "$($script:domains.Count) domain(s) loaded."
+    } catch {
+        Set-Status "Discover error: $_"
+    } finally {
+        $btnDiscover.Enabled = $true
+        $progBar.Visible     = $false
+    }
+})
+
+$btnScan.Add_Click({
+    $sel = $cboDomain.SelectedItem
+    if (-not $sel) { Set-Status 'Select a domain.'; return }
+    $domObj = $script:domains | Where-Object { $_.DomainName -eq $sel } | Select-Object -First 1
+
+    $grid.Rows.Clear()
+    $lblEmpty.Visible    = $false
+    $script:allRows      = @()
+    $script:filteredRows = @()
+    Reset-Cards
+    $txtDetail.Text      = 'Scanning...'
+    $btnScan.Enabled     = $false
+    $btnDiscover.Enabled = $false
+    Set-Status "[$sel] Scanning..." $true
+
+    try {
+        if (-not (Get-Command Get-ADUser -ErrorAction SilentlyContinue)) {
+            [System.Windows.Forms.MessageBox]::Show('RSAT / ActiveDirectory module not found.','ADDetector','OK','Warning')
+            Set-Status 'RSAT missing!'; return
+        }
+
+        Initialize-Columns
+
+        $server = if ($domObj -and $domObj.PDCEmulator) { $domObj.PDCEmulator } else { $sel }
+        Set-Status "[$sel] Querying AD ($server)..." $true
+
+        $props = @('SamAccountName','DisplayName','Enabled','LastLogonDate',
+                   'PasswordLastSet','WhenCreated','Department','Mail',
+                   'Description','DistinguishedName','AdminCount',
+                   'ServicePrincipalName','MemberOf')
+
+        $allUsers = Get-ADUser -Server $server -Filter * -Properties $props -ErrorAction Stop
+        $total    = @($allUsers).Count
+        Set-Status "[$sel] $total users - computing risk..." $true
+
+        $now      = Get-Date
+        $cutoff30 = $now.AddDays(-30)
+        $cutoff90 = $now.AddDays(-90)
+
+        $script:allRows = @(
+            $allUsers | Where-Object {
+                ($_.Enabled -and ($_.LastLogonDate -eq $null -or $_.LastLogonDate -lt $cutoff30)) -or
+                (-not $_.Enabled -and ($_.LastLogonDate -eq $null -or $_.LastLogonDate -lt $cutoff90))
+            } | ForEach-Object { New-UserRow -u $_ -Now $now }
+        )
+
+        Set-Card 'Total'      $total
+        Set-Card 'Inactive'   $script:allRows.Count
+        Set-Card 'Critical'   (@($script:allRows | Where-Object { $_.RiskLevel -eq 'CRITICAL' }).Count)
+        Set-Card 'Privileged' (@($script:allRows | Where-Object { $_.IsPrivileged }).Count)
+        Set-Card 'NeverLogon' (@($script:allRows | Where-Object { $_.NeverLoggedIn }).Count)
+        Set-Card 'SvcAcc'     (@($script:allRows | Where-Object { $_.IsServiceAccount }).Count)
+        Set-Card 'Disabled'   (@($script:allRows | Where-Object { -not $_.Enabled }).Count)
+        Set-Card 'RemoteAcc'  (@($script:allRows | Where-Object { $_.HasVPNAccess -or $_.HasRemoteAccess }).Count)
+        Set-Card 'DormantVPN' (@($script:allRows | Where-Object { $_.HasVPNAccess -and $_.InactiveDays -ge 30 }).Count)
+
+        $script:filteredRows = $script:allRows
+        Apply-Filters
+        $txtDetail.Text = 'Select a user to view details.'
+        $btnCSV.Enabled  = $true
+        $btnXLSX.Enabled = $true
+        Set-Status "[$sel]  Stale: $($script:allRows.Count)  |  Critical: $($script:metricLabels['Critical'].Text)  |  Privileged: $($script:metricLabels['Privileged'].Text)  |  Never Logon: $($script:metricLabels['NeverLogon'].Text)  |  Total: $total"
+
+    } catch {
+        Set-Status "Scan error: $_"
+        [System.Windows.Forms.MessageBox]::Show("Error:`n$_",'ADDetector','OK','Error')
+    } finally {
+        $btnScan.Enabled     = $true
+        $btnDiscover.Enabled = $true
+        $progBar.Visible     = $false
+    }
+})
+
+$grid.Add_SelectionChanged({
+    if ($grid.SelectedRows.Count -gt 0 -and $grid.SelectedRows[0].Tag) {
+        Show-Detail $grid.SelectedRows[0].Tag
+    }
+})
+
+$cboRisk.Add_SelectedIndexChanged({ if ($script:allRows.Count) { Apply-Filters } })
+$chkPrivOnly.Add_CheckedChanged({  if ($script:allRows.Count) { Apply-Filters } })
+$chkNeverOnly.Add_CheckedChanged({ if ($script:allRows.Count) { Apply-Filters } })
+$chkHideSA.Add_CheckedChanged({    if ($script:allRows.Count) { Apply-Filters } })
+$chkHideDis.Add_CheckedChanged({   if ($script:allRows.Count) { Apply-Filters } })
+$chkVPNOnly.Add_CheckedChanged({   if ($script:allRows.Count) { Apply-Filters } })
+$chkRAOnly.Add_CheckedChanged({    if ($script:allRows.Count) { Apply-Filters } })
+$txtSearch.Add_TextChanged({       if ($script:allRows.Count) { Apply-Filters } })
+
+$btnClear.Add_Click({
+    $grid.Rows.Clear()
+    $lblEmpty.Visible    = $true
+    $script:allRows      = @()
+    $script:filteredRows = @()
+    $script:domains      = @()
+    $cboDomain.Items.Clear()
+    $btnScan.Enabled     = $false
+    $btnCSV.Enabled      = $false
+    $btnXLSX.Enabled     = $false
+    $txtDetail.Text      = 'Select a user to view details.'
+    Reset-Cards
+    Set-Status 'Cleared.'
+})
+
+$btnCSV.Add_Click({  Export-CSV-View  })
+$btnXLSX.Add_Click({ Export-XLSX-View })
+
+# ====================================================================
+# LAUNCH
+# ====================================================================
+# Splitter'i form render sonrasi set et (Panel2MinSize race condition fix).
+$form.Add_Shown({
+    try {
+        $w = $mainSplit.Width
+        if ($w -le 0) { return }
+        $desired = [Math]::Max($mainSplit.Panel1MinSize,
+                   [Math]::Min($w - $mainSplit.Panel2MinSize - 5,
+                               [int]($w * 0.68)))
+        $mainSplit.SplitterDistance = $desired
+    } catch {
+        # silent fallback - splitter default position
+    }
+})
+
+[void]$form.ShowDialog()

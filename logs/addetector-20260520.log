@@ -1,0 +1,352 @@
+﻿[2026-05-20 16:43:44][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 16:43:44][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 16:43:44][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 16:43:44][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 16:43:46][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 16:43:46][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 16:43:46][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 16:43:46][INFO][DomainDiscovery] Erisilebilir: DCAMA02.motorasin.com
+[2026-05-20 16:43:46][INFO][DomainDiscovery] Erisilebilir: DCMA01.motorasin.com
+[2026-05-20 16:43:46][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 16:43:46][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 16:43:50][INFO][Discover] Discover started | manual=''
+[2026-05-20 16:43:50][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 16:43:50][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 16:43:50][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 16:43:51][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 16:43:51][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 16:43:51][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 16:43:51][INFO][Discover] Discover OK | count=
+[2026-05-20 16:43:52][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 16:44:03][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 17:48:24][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 17:48:24][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 17:48:24][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 17:48:24][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 17:48:24][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 17:48:24][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 17:48:24][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 17:48:24][INFO][DomainDiscovery] Erisilebilir: dcama02.motorasin.com
+[2026-05-20 17:48:24][INFO][DomainDiscovery] Erisilebilir: dcma01.motorasin.com
+[2026-05-20 17:48:24][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 17:48:24][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 17:48:25][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 17:48:25][INFO][Discover] Discover started | manual=''
+[2026-05-20 17:48:25][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 17:48:25][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 17:48:25][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 17:48:25][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 17:48:25][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 17:48:25][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 17:48:25][INFO][Discover] Discover OK | count=
+[2026-05-20 17:48:34][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 17:48:43][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 19:52:55][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 19:52:55][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 19:52:55][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 19:52:55][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 19:52:55][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 19:52:55][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 19:52:56][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 19:52:56][INFO][DomainDiscovery] Erisilebilir: dcama02.motorasin.com
+[2026-05-20 19:52:56][INFO][DomainDiscovery] Erisilebilir: dcma01.motorasin.com
+[2026-05-20 19:52:56][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 19:52:56][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 19:52:56][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 19:52:56][INFO][Discover] Discover started | manual=''
+[2026-05-20 19:52:56][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 19:52:56][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 19:52:56][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 19:52:56][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 19:52:56][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 19:52:56][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 19:52:57][INFO][Discover] Discover OK | count=
+[2026-05-20 19:53:11][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 19:53:21][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 19:53:58][INFO][Discover] Discover started | manual=''
+[2026-05-20 19:53:58][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 19:53:58][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 19:53:58][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 19:53:58][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 19:53:58][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 19:53:58][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 19:53:59][INFO][Discover] Discover OK | count=
+[2026-05-20 19:53:59][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 19:54:09][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 19:55:16][INFO][Discover] Discover started | manual=''
+[2026-05-20 19:55:16][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 19:55:16][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 19:55:16][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 19:55:16][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 19:55:16][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 19:55:16][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 19:55:17][INFO][Discover] Discover OK | count=
+[2026-05-20 19:55:20][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 19:55:29][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 20:03:23][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 20:03:23][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:03:23][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:03:23][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:03:23][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:03:23][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:03:23][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:03:23][INFO][DomainDiscovery] Erisilebilir: dcama02.motorasin.com
+[2026-05-20 20:03:23][INFO][DomainDiscovery] Erisilebilir: dcma01.motorasin.com
+[2026-05-20 20:03:23][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 20:03:23][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 20:03:24][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 20:03:24][INFO][Discover] Discover started | manual=''
+[2026-05-20 20:03:24][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:03:24][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:03:24][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:03:24][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:03:24][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:03:24][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:03:24][INFO][Discover] Discover OK | count=
+[2026-05-20 20:04:23][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 20:04:32][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 20:19:17][INFO][Scan] Scan requested | domain=motorasin.com | mode=inactive >= 30 days
+[2026-05-20 20:19:20][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=118
+[2026-05-20 20:20:44][INFO][Scan] Scan requested | domain=motorasin.com | mode=inactive >= 7 days
+[2026-05-20 20:20:49][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=216
+[2026-05-20 20:36:59][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 20:36:59][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:36:59][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:36:59][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:37:00][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:37:00][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:37:00][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:37:00][INFO][DomainDiscovery] Erisilebilir: dcama02.motorasin.com
+[2026-05-20 20:37:00][INFO][DomainDiscovery] Erisilebilir: dcma01.motorasin.com
+[2026-05-20 20:37:00][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 20:37:00][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 20:37:01][INFO][Branding] Icon synthesized from PNG: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 20:37:01][INFO][Branding] Logo loaded: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 20:37:01][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 20:37:01][INFO][Discover] Discover started | manual=''
+[2026-05-20 20:37:01][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:37:01][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:37:01][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:37:01][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:37:01][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:37:01][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:37:01][INFO][Discover] Discover OK | count=
+[2026-05-20 20:38:34][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 20:38:34][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:38:34][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:38:34][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:38:35][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:38:35][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:38:35][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:38:35][INFO][DomainDiscovery] Erisilebilir: dcama02.motorasin.com
+[2026-05-20 20:38:35][INFO][DomainDiscovery] Erisilebilir: dcma01.motorasin.com
+[2026-05-20 20:38:35][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 20:38:35][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 20:38:35][INFO][Branding] Icon synthesized from PNG: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 20:38:35][INFO][Branding] Logo loaded: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 20:38:35][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 20:38:35][INFO][Discover] Discover started | manual=''
+[2026-05-20 20:38:35][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:38:35][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:38:35][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:38:36][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:38:36][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:38:36][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:38:36][INFO][Discover] Discover OK | count=
+[2026-05-20 20:38:57][INFO][Discover] Discover started | manual=''
+[2026-05-20 20:38:57][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:38:57][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:38:57][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:38:57][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:38:57][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:38:57][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:38:57][INFO][Discover] Discover OK | count=
+[2026-05-20 20:39:01][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 20:39:11][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 20:48:20][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 20:48:20][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:48:20][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:48:20][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:48:20][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:48:20][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:48:20][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:48:20][INFO][DomainDiscovery] Erisilebilir: DCAMA02.motorasin.com
+[2026-05-20 20:48:20][INFO][DomainDiscovery] Erisilebilir: DCMA01.motorasin.com
+[2026-05-20 20:48:20][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 20:48:20][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 20:48:21][INFO][Branding] Icon synthesized from PNG: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 20:48:21][INFO][Branding] Logo loaded: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 20:48:22][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 20:48:22][INFO][Discover] Discover started | manual=''
+[2026-05-20 20:48:22][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:48:22][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:48:22][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:48:22][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:48:22][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:48:22][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:48:22][INFO][Discover] Discover OK | count=
+[2026-05-20 20:48:45][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 20:48:54][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 20:52:50][INFO][Discover] Discover started | manual=''
+[2026-05-20 20:52:50][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:52:50][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:52:50][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:52:50][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:52:50][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:52:50][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:52:51][INFO][Discover] Discover OK | count=
+[2026-05-20 20:52:53][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 20:53:02][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 20:58:28][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 20:58:28][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:58:28][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:58:28][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:58:29][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:58:29][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:58:29][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:58:29][INFO][DomainDiscovery] Erisilebilir: dcama02.motorasin.com
+[2026-05-20 20:58:29][INFO][DomainDiscovery] Erisilebilir: dcma01.motorasin.com
+[2026-05-20 20:58:29][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 20:58:29][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 20:58:29][INFO][Branding] Icon synthesized from PNG: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 20:58:29][INFO][Branding] Logo loaded: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 20:58:29][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 20:58:29][INFO][Discover] Discover started | manual=''
+[2026-05-20 20:58:29][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 20:58:29][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 20:58:29][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 20:58:29][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 20:58:30][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 20:58:30][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 20:58:30][INFO][Discover] Discover OK | count=
+[2026-05-20 21:04:29][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 21:04:38][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 21:26:20][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 21:26:20][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 21:26:20][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 21:26:20][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 21:26:21][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 21:26:21][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 21:26:21][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 21:26:21][INFO][DomainDiscovery] Erisilebilir: dcama02.motorasin.com
+[2026-05-20 21:26:21][INFO][DomainDiscovery] Erisilebilir: dcma01.motorasin.com
+[2026-05-20 21:26:21][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 21:26:21][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 21:26:21][INFO][Branding] Icon synthesized from PNG: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 21:26:21][INFO][Branding] Logo loaded: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 21:26:21][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 21:26:21][INFO][Discover] Discover started | manual=''
+[2026-05-20 21:26:21][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 21:26:21][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 21:26:21][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 21:26:21][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 21:26:21][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 21:26:22][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 21:26:22][INFO][Discover] Discover OK | count=
+[2026-05-20 21:27:02][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 21:27:12][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 21:38:04][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 21:38:04][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 21:38:04][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 21:38:05][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 21:38:05][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 21:38:05][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 21:38:05][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 21:38:05][INFO][DomainDiscovery] Erisilebilir: dcama02.motorasin.com
+[2026-05-20 21:38:05][INFO][DomainDiscovery] Erisilebilir: dcma01.motorasin.com
+[2026-05-20 21:38:05][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 21:38:05][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 21:38:05][INFO][Branding] Icon synthesized from PNG: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 21:38:05][INFO][Branding] Logo loaded: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 21:38:05][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 21:38:05][INFO][Discover] Discover started | manual=''
+[2026-05-20 21:38:05][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 21:38:05][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 21:38:05][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 21:38:06][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 21:38:06][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 21:38:06][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 21:38:06][INFO][Discover] Discover OK | count=
+[2026-05-20 21:38:29][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 21:38:39][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 21:38:49][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 21:38:49][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 21:38:49][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 21:38:49][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 21:38:49][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 21:38:49][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 21:38:49][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 21:38:49][INFO][DomainDiscovery] Erisilebilir: dcama02.motorasin.com
+[2026-05-20 21:38:49][INFO][DomainDiscovery] Erisilebilir: dcma01.motorasin.com
+[2026-05-20 21:38:49][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 21:38:49][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 21:38:49][INFO][Branding] Icon synthesized from PNG: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 21:38:49][INFO][Branding] Logo loaded: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 21:38:50][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 21:38:50][INFO][Discover] Discover started | manual=''
+[2026-05-20 21:38:50][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 21:38:50][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 21:38:50][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 21:38:50][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 21:38:50][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 21:38:50][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 21:38:50][INFO][Discover] Discover OK | count=
+[2026-05-20 21:38:52][INFO][Discover] Discover started | manual=''
+[2026-05-20 21:38:52][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 21:38:52][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 21:38:52][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 21:38:52][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 21:38:52][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 21:38:52][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 21:38:52][INFO][Discover] Discover OK | count=
+[2026-05-20 21:38:53][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 21:39:02][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 21:43:11][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 21:43:11][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 21:43:11][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 21:43:11][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 21:43:12][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 21:43:12][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 21:43:12][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 21:43:12][INFO][DomainDiscovery] Erisilebilir: DCAMA02.motorasin.com
+[2026-05-20 21:43:12][INFO][DomainDiscovery] Erisilebilir: DCMA01.motorasin.com
+[2026-05-20 21:43:12][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 21:43:12][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 21:43:12][INFO][Branding] Icon synthesized from PNG: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 21:43:12][INFO][Branding] Logo loaded: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 21:43:12][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 21:43:12][INFO][Discover] Discover started | manual=''
+[2026-05-20 21:43:12][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 21:43:12][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 21:43:12][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 21:43:13][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 21:43:13][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 21:43:13][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 21:43:13][INFO][Discover] Discover OK | count=
+[2026-05-20 21:52:07][INFO][Startup] ADDetector starting | BasePath=C:\ADDetector
+[2026-05-20 21:52:07][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 21:52:07][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 21:52:07][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 21:52:07][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 21:52:07][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 21:52:07][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 21:52:07][INFO][DomainDiscovery] Erisilebilir: DCAMA02.motorasin.com
+[2026-05-20 21:52:07][INFO][DomainDiscovery] Erisilebilir: DCMA01.motorasin.com
+[2026-05-20 21:52:07][INFO][Loader] DomainDiscovery loaded
+[2026-05-20 21:52:07][INFO][Loader] DetectionConfig loaded | cfg=C:\ADDetector\config\detection-groups.json
+[2026-05-20 21:52:07][INFO][Branding] Icon synthesized from PNG: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 21:52:08][INFO][Branding] Logo loaded: C:\ADDetector\MA_Cyber_Logo.png
+[2026-05-20 21:52:08][INFO][AutoStart] Auto-discover triggered
+[2026-05-20 21:52:08][INFO][Discover] Discover started | manual=''
+[2026-05-20 21:52:08][INFO][DomainDiscovery] Forest discovery baslatiliyor...
+[2026-05-20 21:52:08][INFO][DomainDiscovery] Forest: motorasin.com | Domain sayisi: 1
+[2026-05-20 21:52:08][INFO][DomainDiscovery] motorasin.com | DC: 2
+[2026-05-20 21:52:08][INFO][DomainDiscovery] CurrentDomain fallback: motorasin.com
+[2026-05-20 21:52:08][INFO][DomainDiscovery] Manuel entry: motorasin.com
+[2026-05-20 21:52:08][INFO][DomainDiscovery] motorasin.com | SRV ile 2 DC bulundu
+[2026-05-20 21:52:08][INFO][Discover] Discover OK | count=1
+[2026-05-20 21:52:08][INFO][AutoStart] Single domain -> auto-scan
+[2026-05-20 21:52:08][INFO][Scan] Scan requested | domain=motorasin.com | mode=ALL users (no filter)
+[2026-05-20 21:52:18][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=391
+[2026-05-20 21:59:06][INFO][Scan] Scan requested | domain=motorasin.com | mode=inactive >= 30 days
+[2026-05-20 21:59:09][INFO][Scan] Scan complete | domain=motorasin.com | total=391 | stale=118

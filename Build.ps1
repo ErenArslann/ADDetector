@@ -103,6 +103,71 @@ Copy-Item (Join-Path $root 'modules\DetectionConfig.ps1')   (Join-Path $OutDir '
 Copy-Item (Join-Path $root 'config\detection-groups.json')  (Join-Path $OutDir 'config')  -Force
 Write-OK "Files copied."
 
+# ---------- 6b) Logo + ICO (soft-fail) ----------
+Write-Step "Branding: logo + icon..."
+
+# Audit flags
+$logoFound  = $false
+$icoBuilt   = $false
+$icoEmbedded = $false
+
+# Logo: prefer ADDetector.png, fallback MA_Cyber_Logo.png (legacy)
+$logoCandidates = @(
+    (Join-Path $root 'ADDetector.png'),
+    (Join-Path $root 'MA_Cyber_Logo.png')
+)
+$logoSrc = $logoCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+
+if ($logoSrc) {
+    try {
+        Copy-Item $logoSrc (Join-Path $OutDir 'ADDetector.png') -Force
+        $logoFound = $true
+        Write-OK "Logo copied: $logoSrc -> ADDetector.png"
+    } catch {
+        Write-Warn2 "Logo copy failed (non-fatal): $_"
+    }
+} else {
+    Write-Warn2 "No logo PNG found (ADDetector.png / MA_Cyber_Logo.png). Skipping."
+}
+
+# ICO: prefer ADDetector.ico, else generate from PNG via System.Drawing
+$icoSrc  = Join-Path $root 'ADDetector.ico'
+$icoDest = Join-Path $OutDir 'ADDetector.ico'
+
+if (Test-Path $icoSrc) {
+    try {
+        Copy-Item $icoSrc $icoDest -Force
+        $icoBuilt = $true
+        Write-OK "ICO copied: ADDetector.ico"
+    } catch {
+        Write-Warn2 "ICO copy failed (non-fatal): $_"
+    }
+} elseif ($logoSrc) {
+    Write-Step "ADDetector.ico not found - generating from PNG via System.Drawing..."
+    try {
+        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+        $bmp    = New-Object System.Drawing.Bitmap($logoSrc)
+        $resized = New-Object System.Drawing.Bitmap($bmp, (New-Object System.Drawing.Size(256, 256)))
+        $hIcon  = $resized.GetHicon()
+        $icon   = [System.Drawing.Icon]::FromHandle($hIcon)
+
+        $fs = [System.IO.File]::Open($icoDest, [System.IO.FileMode]::Create)
+        $icon.Save($fs)
+        $fs.Close()
+        $icon.Dispose()
+        $resized.Dispose()
+        $bmp.Dispose()
+
+        $icoBuilt = $true
+        Write-OK "ICO generated from PNG: $icoDest"
+    } catch {
+        Write-Warn2 "PNG->ICO generation failed (non-fatal): $_"
+        Write-Warn2 "EXE will be built without embedded icon."
+    }
+} else {
+    Write-Warn2 "No ICO source available. EXE will have no icon."
+}
+
 # ---------- 7) Compile EXE ----------
 $launcher = Join-Path $root 'Launcher.ps1'
 $exePath  = Join-Path $OutDir 'ADDetector.exe'
@@ -110,19 +175,28 @@ $exePath  = Join-Path $OutDir 'ADDetector.exe'
 Write-Step "Compiling Launcher.ps1 -> ADDetector.exe (noConsole)..."
 $ps2exeLog = Join-Path $outParent 'ps2exe-build.log'
 try {
-    # Capture ps2exe verbose output to log file, do NOT pipe (avoids stdout corruption).
-    Invoke-ps2exe `
-        -inputFile  $launcher `
-        -outputFile $exePath `
-        -noConsole `
-        -title       'ADDetector' `
-        -description 'AD Hygiene & Exposure Visibility' `
-        -company     'ADDetector' `
-        -product     'ADDetector' `
-        -version     $Version `
-        -STA `
-        -verbose `
-        -ErrorAction Stop *> $ps2exeLog
+    $ps2exeParams = @{
+        inputFile   = $launcher
+        outputFile  = $exePath
+        noConsole   = $true
+        title       = 'ADDetector'
+        description = 'AD Hygiene & Exposure Visibility'
+        company     = 'Eren Arslan'
+        product     = 'ADDetector'
+        copyright   = "Copyright (c) $(Get-Date -Format yyyy) Eren Arslan"
+        version     = $Version
+        STA         = $true
+        verbose     = $true
+        ErrorAction = 'Stop'
+    }
+
+    # ICO embed: soft - only if file exists and is valid
+    if ($icoBuilt -and (Test-Path $icoDest)) {
+        $ps2exeParams['iconFile'] = $icoDest
+        $icoEmbedded = $true
+    }
+
+    Invoke-ps2exe @ps2exeParams *> $ps2exeLog
 } catch {
     Write-Err2 "ps2exe compile failed: $_"
     Write-Host "    Log: $ps2exeLog"
@@ -146,10 +220,24 @@ try {
     Write-Warn2 "Zip creation failed (non-fatal): $_"
 }
 
+# ---------- 9) Release summary ----------
+$distFiles = Get-ChildItem $OutDir -Recurse -File |
+    Select-Object -ExpandProperty FullName |
+    ForEach-Object { $_.Replace($OutDir, '').TrimStart('\') }
+
 Write-Host ""
 Write-Host "==================================================" -ForegroundColor Green
-Write-Host " BUILD OK" -ForegroundColor Green
+Write-Host " BUILD OK  --  ADDetector v$Version"              -ForegroundColor Green
 Write-Host "==================================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "  Release Audit:" -ForegroundColor Cyan
+Write-Host ("  Logo found      : " + $(if ($logoFound)    { "YES" } else { "NO (warning)" })) -ForegroundColor $(if ($logoFound)    { 'Green' } else { 'Yellow' })
+Write-Host ("  ICO built       : " + $(if ($icoBuilt)     { "YES" } else { "NO (warning)" })) -ForegroundColor $(if ($icoBuilt)     { 'Green' } else { 'Yellow' })
+Write-Host ("  ICO embedded    : " + $(if ($icoEmbedded)  { "YES" } else { "NO (warning)" })) -ForegroundColor $(if ($icoEmbedded)  { 'Green' } else { 'Yellow' })
+Write-Host ""
+Write-Host "  Dist files:" -ForegroundColor Cyan
+$distFiles | ForEach-Object { Write-Host "    $_" }
+Write-Host ""
 Write-Host "  Folder : $OutDir"
 if (Test-Path $zipPath) { Write-Host "  Zip    : $zipPath" }
 Write-Host "  Run    : $exePath"

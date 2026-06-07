@@ -1,0 +1,26 @@
+# ADDetector - Git ignore
+
+# Runtime output (her makinede olusur, repoya girmesin)
+logs/
+exports/
+dist/
+yedek/
+
+# Build artifacts
+*.zip
+*.exe
+ps2exe-build.log
+
+# OS artifacts
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Editor
+.vscode/
+*.suo
+*.user
+
+# Temp
+*.tmp
+*.bak

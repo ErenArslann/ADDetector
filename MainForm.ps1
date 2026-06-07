@@ -239,6 +239,7 @@ $form.Size          = New-Object System.Drawing.Size(1800, 880)
 $form.MinimumSize   = New-Object System.Drawing.Size(1280, 700)
 $form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
 $form.StartPosition = 'CenterScreen'
+$form.WindowState   = [System.Windows.Forms.FormWindowState]::Maximized
 $form.BackColor     = $C.BgDark
 $form.Font          = $F.UI
 $form.ForeColor     = $C.FgPrimary
@@ -434,7 +435,7 @@ $cboThreshold.FlatStyle   = 'Flat'
 $cboThreshold.BackColor   = $C.BgCard
 $cboThreshold.ForeColor   = $C.FgPrimary
 @('0 (All users)','7','15','30','60','90','180','365') | ForEach-Object { [void]$cboThreshold.Items.Add($_) }
-$cboThreshold.SelectedIndex = 0  # default: All users (0)
+$cboThreshold.SelectedIndex = 0  # default: All users — SOC workflow
 
 function New-Btn {
     param([string]$Text, [int]$X, [System.Drawing.Color]$Bg, [int]$W = 92)
@@ -456,7 +457,12 @@ $btnXLSX     = New-Btn 'XLSX'     1198 ([System.Drawing.Color]::FromArgb(40, 130
 $btnCSV.Enabled  = $false
 $btnXLSX.Enabled = $false
 
-$topBar.Controls.AddRange(@($picLogo,$lblTitle,$lblSub,$topDivider,$lblDomLbl,$cboDomain,$lblManLbl,$txtManual,$lblThrLbl,$cboThreshold,$btnDiscover,$btnScan,$btnClear,$btnCSV,$btnXLSX))
+$btnAbout    = New-Btn '?' 1276 ([System.Drawing.Color]::FromArgb(50, 55, 80)) 28
+$btnAbout.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
+$btnAbout.FlatAppearance.BorderSize = 1
+$btnAbout.FlatAppearance.BorderColor = $C.Border
+
+$topBar.Controls.AddRange(@($picLogo,$lblTitle,$lblSub,$topDivider,$lblDomLbl,$cboDomain,$lblManLbl,$txtManual,$lblThrLbl,$cboThreshold,$btnDiscover,$btnScan,$btnClear,$btnCSV,$btnXLSX,$btnAbout))
 
 # ?? METRIC CARDS ?????????????????????????????????????????????????????????????
 $cardBar           = New-Object System.Windows.Forms.Panel
@@ -573,10 +579,15 @@ function Invoke-CardFilter {
     $cboRisk.SelectedIndex   = 0
     $chkPrivOnly.Checked     = $false
     $chkNeverOnly.Checked    = $false
-    $chkHideSA.Checked       = $false   # SA gizleme - card sayilari ile uyumlu
+    $chkHideSA.Checked       = $false
     $chkHideDis.Checked      = $false
     $chkVPNOnly.Checked      = $false
     $chkRAOnly.Checked       = $false
+    # Multi-select dropdown'ları da temizle
+    $script:TypeFilter = @(); Update-MultiBtn $script:TypeDD 'Type'
+    $script:DeptFilter = @(); Update-MultiBtn $script:DeptDD 'Dept'
+    for ($i = 0; $i -lt $script:TypeDD.Clb.Items.Count; $i++) { $script:TypeDD.Clb.SetItemChecked($i, $false) }
+    for ($i = 0; $i -lt $script:DeptDD.Clb.Items.Count; $i++) { $script:DeptDD.Clb.SetItemChecked($i, $false) }
     if ($txtSearch.Text -ne $script:SearchPlaceholder) {
         $txtSearch.Text = $script:SearchPlaceholder
         $txtSearch.ForeColor = $script:C.FgMuted
@@ -597,14 +608,22 @@ function Invoke-CardFilter {
     Apply-Filters
 }
 
-# Aktif card'a accent border ekle, digerlerinden kaldir
+# Aktif card'a belirgin highlight: arkaplan + accent bar tam beyaz + label renk degisimi
 function Update-CardHighlight {
     foreach ($ctl in $cardBar.Controls) {
-        if ($ctl -is [System.Windows.Forms.Panel] -and $ctl.Tag) {
-            if ($ctl.Tag -eq $script:ActiveCardFilter) {
-                $ctl.BackColor = $script:C.BgRowAlt
-            } else {
-                $ctl.BackColor = $script:C.BgCard
+        if (-not ($ctl -is [System.Windows.Forms.Panel] -and $ctl.Tag)) { continue }
+        $cardDef = $cardDefs | Where-Object { $_.Key -eq $ctl.Tag } | Select-Object -First 1
+        if ($ctl.Tag -eq $script:ActiveCardFilter) {
+            # Secili: parlak bg + accent bar beyaz + value label accent renginde
+            $ctl.BackColor = [System.Drawing.Color]::FromArgb(55, 65, 95)
+            if ($ctl.Controls.Count -ge 1) { $ctl.Controls[0].BackColor = [System.Drawing.Color]::White }
+            # Value label (index 1) ve key label (index 2) rengi
+            if ($ctl.Controls.Count -ge 2) { $ctl.Controls[1].ForeColor = [System.Drawing.Color]::White }
+        } else {
+            $ctl.BackColor = $script:C.BgCard
+            if ($cardDef) {
+                if ($ctl.Controls.Count -ge 1) { $ctl.Controls[0].BackColor = $cardDef.Accent }
+                if ($ctl.Controls.Count -ge 2) { $ctl.Controls[1].ForeColor = $script:C.FgPrimary }
             }
         }
     }
@@ -688,6 +707,136 @@ $btnDetail.FlatAppearance.BorderColor = $C.Border
 
 $filterBar.Controls.AddRange(@($cboRisk,$chkPrivOnly,$chkNeverOnly,$chkHideSA,$chkHideDis,$chkVPNOnly,$chkRAOnly,$lblSrch,$txtSearch,$btnDetail))
 
+# ── Multi-select dropdown: Type ve Department ─────────────────────────────────
+# Floating panel (Toplevel=false, form'a eklenir, filterBar'a degil)
+# Butona basinca asagida acilir, disari tiklaninca kapanir.
+
+$script:TypeFilter = @()        # secili types (bos = tumu)
+$script:DeptFilter = @()        # secili departments (bos = tumu)
+
+function New-MultiDropdown {
+    param([string]$Title, [int]$BtnX)
+
+    $btn = New-Object System.Windows.Forms.Button
+    $btn.Text     = "$Title  ▾"
+    $btn.Location = New-Object System.Drawing.Point($BtnX, 7)
+    $btn.Size     = New-Object System.Drawing.Size(110, 22)
+    $btn.FlatStyle = 'Flat'
+    $btn.BackColor = $C.BgCard
+    $btn.ForeColor = $C.FgSecondary
+    $btn.Font      = $F.UISm
+    $btn.FlatAppearance.BorderSize  = 1
+    $btn.FlatAppearance.BorderColor = $C.Border
+    $btn.Tag = $Title  # 'Type' or 'Department'
+    $filterBar.Controls.Add($btn)
+
+    $popup = New-Object System.Windows.Forms.Panel
+    $popup.BackColor   = $C.BgCard
+    $popup.BorderStyle = 'FixedSingle'
+    $popup.Size        = New-Object System.Drawing.Size(180, 160)
+    $popup.Visible     = $false
+    $popup.BringToFront()
+
+    $clb = New-Object System.Windows.Forms.CheckedListBox
+    $clb.Dock          = 'Fill'
+    $clb.BackColor     = $C.BgCard
+    $clb.ForeColor     = $C.FgPrimary
+    $clb.Font          = $F.UISm
+    $clb.BorderStyle   = 'None'
+    $clb.CheckOnClick  = $true
+
+    $popup.Controls.Add($clb)
+
+    return @{ Btn=$btn; Popup=$popup; Clb=$clb }
+}
+
+$script:TypeDD = New-MultiDropdown 'Type' 860
+$script:DeptDD = New-MultiDropdown 'Dept' 975
+
+# Popup'ları form'a ekle (filterBar'a değil — z-order için)
+$form.Controls.Add($script:TypeDD.Popup)
+$form.Controls.Add($script:DeptDD.Popup)
+
+function Show-MultiDropdown {
+    param($dd, [string]$Key)
+
+    # Diger popup'u kapat
+    $other = if ($Key -eq 'Type') { $script:DeptDD } else { $script:TypeDD }
+    $other.Popup.Visible = $false
+
+    if ($dd.Popup.Visible) { $dd.Popup.Visible = $false; return }
+
+    # Konumlandır: butonun alt-sol kosesi
+    $btnScreen = $dd.Btn.PointToScreen([System.Drawing.Point]::Empty)
+    $formScreen = $form.PointToScreen([System.Drawing.Point]::Empty)
+    $x = $btnScreen.X - $formScreen.X
+    $y = $btnScreen.Y - $formScreen.Y + $dd.Btn.Height + 2
+    $dd.Popup.Location = New-Object System.Drawing.Point($x, $y)
+    $dd.Popup.BringToFront()
+    $dd.Popup.Visible = $true
+}
+
+# Populate Type dropdown (static - AccountType values)
+@('User','Privileged','Svc Acct') | ForEach-Object { [void]$script:TypeDD.Clb.Items.Add($_, $false) }
+
+# Populate Department dropdown - scan sonrası doldurulur
+function Populate-DeptDropdown {
+    $depts = @($script:allRows | Where-Object { $_.Department } |
+        Select-Object -ExpandProperty Department | Sort-Object -Unique)
+    $script:DeptDD.Clb.Items.Clear()
+    foreach ($d in $depts) { [void]$script:DeptDD.Clb.Items.Add($d, $false) }
+}
+
+# Button label güncelle (seçim varsa badge göster)
+function Update-MultiBtn {
+    param($dd, [string]$Key)
+    $checked = @($dd.Clb.CheckedItems)
+    if ($checked.Count -eq 0) {
+        $dd.Btn.Text      = "$Key  ▾"
+        $dd.Btn.ForeColor = $script:C.FgSecondary
+        $dd.Btn.BackColor = $script:C.BgCard
+    } else {
+        $dd.Btn.Text      = "$Key ($($checked.Count))  ▾"
+        $dd.Btn.ForeColor = $script:C.AccentBlue
+        $dd.Btn.BackColor = $script:C.BgSection
+    }
+}
+
+# CheckedListBox change -> filter
+$script:TypeDD.Clb.Add_ItemCheck({
+    $script:TypeFilter = @()
+    # ItemCheck fires before state updates — handle via timer
+    $t = New-Object System.Windows.Forms.Timer; $t.Interval = 30
+    $t.Add_Tick({
+        $t.Stop(); $t.Dispose()
+        $script:TypeFilter = @($script:TypeDD.Clb.CheckedItems | ForEach-Object { "$_" })
+        Update-MultiBtn $script:TypeDD 'Type'
+        if ($script:allRows.Count) { Apply-Filters }
+    })
+    $t.Start()
+})
+
+$script:DeptDD.Clb.Add_ItemCheck({
+    $t = New-Object System.Windows.Forms.Timer; $t.Interval = 30
+    $t.Add_Tick({
+        $t.Stop(); $t.Dispose()
+        $script:DeptFilter = @($script:DeptDD.Clb.CheckedItems | ForEach-Object { "$_" })
+        Update-MultiBtn $script:DeptDD 'Dept'
+        if ($script:allRows.Count) { Apply-Filters }
+    })
+    $t.Start()
+})
+
+# Button clicks
+$script:TypeDD.Btn.Add_Click({ Show-MultiDropdown $script:TypeDD 'Type' })
+$script:DeptDD.Btn.Add_Click({ Show-MultiDropdown $script:DeptDD 'Dept' })
+
+# Form click -> popup kapat (dışarı tıklayınca)
+$form.Add_Click({
+    $script:TypeDD.Popup.Visible = $false
+    $script:DeptDD.Popup.Visible = $false
+})
+
 # ?? STATUS BAR ???????????????????????????????????????????????????????????????
 $statusBar        = New-Object System.Windows.Forms.StatusStrip
 $statusBar.BackColor  = $C.BgMid
@@ -730,6 +879,7 @@ $grid.BorderStyle                  = 'None'
 $grid.RowHeadersVisible            = $false
 $grid.AutoSizeColumnsMode          = 'None'
 $grid.AutoSizeRowsMode             = 'None'
+$grid.AllowUserToResizeRows        = $false
 $grid.ScrollBars                   = 'Both'
 $grid.EnableHeadersVisualStyles    = $false
 $grid.ColumnHeadersHeight          = 30
@@ -955,11 +1105,15 @@ function New-UserRow {
     }
 
     # Config-driven group matching (groups exact > regex fallback, isEnabled gated)
-    $matched = Get-MatchedGroupsByCategory -MemberOfFlat $memberOfFlat
+    $matched = $null
+    try { $matched = Get-MatchedGroupsByCategory -MemberOfFlat $memberOfFlat } catch { }
+    if (-not $matched) {
+        $matched = @{ vpn=@(); mfa=@(); remoteAccess=@(); privileged=@(); serviceAccount=@() }
+    }
     $r.MatchedGroups   = $matched
-    $r.VPNGroups       = @($matched.vpn)
-    $r.MFAGroups       = @($matched.mfa)
-    $r.RAGroups        = @($matched.remoteAccess)
+    $r.VPNGroups       = @(if ($matched.vpn)          { $matched.vpn          } else { @() })
+    $r.MFAGroups       = @(if ($matched.mfa)          { $matched.mfa          } else { @() })
+    $r.RAGroups        = @(if ($matched.remoteAccess) { $matched.remoteAccess } else { @() })
     $r.HasVPNAccess    = ($r.VPNGroups.Count -gt 0)
     $r.HasMFA          = ($r.MFAGroups.Count -gt 0)
     $r.HasRemoteAccess = ($r.RAGroups.Count  -gt 0)
@@ -1073,11 +1227,15 @@ function Update-Grid {
     }
 
     $grid.ResumeLayout()
-    # Re-enable redraw + force single repaint
     try {
         [PInvoke.Win32MsgHelper]::SendMessage($grid.Handle, 0x000B, 1, [System.IntPtr]::Zero) | Out-Null
         $grid.Refresh()
     } catch { }
+
+    # Tek satir kaldiysa otomatik sec
+    if (Get-Command Select-FirstRowIfSingle -ErrorAction SilentlyContinue) {
+        Select-FirstRowIfSingle
+    }
 }
 
 # ====================================================================
@@ -1089,35 +1247,38 @@ function Apply-Filters {
     # Placeholder text'i search olarak alma
     if ($srch -eq $script:SearchPlaceholder.Trim().ToLower()) { $srch = '' }
 
-    # Card filter aktifse predicate'ini kullan, normal filter'lari atla
-    if ($script:ActiveCardFilter -and $script:CardPredicates.ContainsKey($script:ActiveCardFilter)) {
-        $pred = $script:CardPredicates[$script:ActiveCardFilter]
-        $script:filteredRows = @($script:allRows | Where-Object {
-            $r = $_
+    # Card filter aktifse predicate'i BASE olarak kullan,
+    # üstüne checkbox/risk/search AND olarak eklenir (exclusive değil)
+    $script:filteredRows = @($script:allRows | Where-Object {
+        $r = $_
+
+        # Card predicate (base scope)
+        if ($script:ActiveCardFilter -and $script:CardPredicates.ContainsKey($script:ActiveCardFilter)) {
+            $pred = $script:CardPredicates[$script:ActiveCardFilter]
             if (-not (& $pred $r)) { return $false }
-            if ($srch) {
-                $hay = "$($r.SamAccountName) $($r.DisplayName) $($r.Department) $($r.Mail) $($r.DistinguishedName)".ToLower()
-                if ($hay -notlike "*$srch*") { return $false }
-            }
-            return $true
-        })
-    } else {
-        $script:filteredRows = @($script:allRows | Where-Object {
-            $r = $_
-            if ($rf -ne 'All Risk Levels' -and $r.RiskLevel -ne $rf) { return $false }
-            if ($chkPrivOnly.Checked  -and -not $r.IsPrivileged)     { return $false }
-            if ($chkNeverOnly.Checked -and -not $r.NeverLoggedIn)    { return $false }
-            if ($chkHideSA.Checked    -and $r.IsServiceAccount)      { return $false }
-            if ($chkHideDis.Checked   -and -not $r.Enabled)          { return $false }
-            if ($chkVPNOnly.Checked   -and -not ($r.HasVPNAccess -or $r.HasMFA)) { return $false }
-            if ($chkRAOnly.Checked    -and -not $r.HasRemoteAccess)  { return $false }
-            if ($srch) {
-                $hay = "$($r.SamAccountName) $($r.DisplayName) $($r.Department) $($r.Mail) $($r.DistinguishedName)".ToLower()
-                if ($hay -notlike "*$srch*") { return $false }
-            }
-            return $true
-        })
-    }
+        }
+
+        # Type multi-select
+        if ($script:TypeFilter -and $script:TypeFilter.Count -gt 0) {
+            if ($r.AccountType -notin $script:TypeFilter) { return $false }
+        }
+        # Department multi-select
+        if ($script:DeptFilter -and $script:DeptFilter.Count -gt 0) {
+            if ($r.Department -notin $script:DeptFilter) { return $false }
+        }
+        if ($rf -ne 'All Risk Levels' -and $r.RiskLevel -ne $rf) { return $false }
+        if ($chkPrivOnly.Checked  -and -not $r.IsPrivileged)     { return $false }
+        if ($chkNeverOnly.Checked -and -not $r.NeverLoggedIn)    { return $false }
+        if ($chkHideSA.Checked    -and $r.IsServiceAccount)      { return $false }
+        if ($chkHideDis.Checked   -and -not $r.Enabled)          { return $false }
+        if ($chkVPNOnly.Checked   -and -not ($r.HasVPNAccess -or $r.HasMFA)) { return $false }
+        if ($chkRAOnly.Checked    -and -not $r.HasRemoteAccess)  { return $false }
+        if ($srch) {
+            $hay = "$($r.SamAccountName) $($r.DisplayName) $($r.Department) $($r.Mail) $($r.DistinguishedName)".ToLower()
+            if ($hay -notlike "*$srch*") { return $false }
+        }
+        return $true
+    })
     Update-Grid
     $tag = if ($script:ActiveCardFilter) { " [card: $($script:ActiveCardFilter)]" } else { '' }
     Set-Status "Showing $($script:filteredRows.Count) of $($script:allRows.Count) accounts$tag"
@@ -1533,8 +1694,93 @@ function Show-Detail {
 }
 
 # ====================================================================
+# ABOUT DIALOG
+# ====================================================================
+function Show-AboutDialog {
+    $dlg               = New-Object System.Windows.Forms.Form
+    $dlg.Text          = 'About ADDetector'
+    $dlg.Size          = New-Object System.Drawing.Size(420, 310)
+    $dlg.MinimumSize   = New-Object System.Drawing.Size(420, 310)
+    $dlg.MaximumSize   = New-Object System.Drawing.Size(420, 310)
+    $dlg.StartPosition = 'CenterParent'
+    $dlg.BackColor     = $script:C.BgMid
+    $dlg.ForeColor     = $script:C.FgPrimary
+    $dlg.FormBorderStyle = 'FixedDialog'
+    $dlg.MaximizeBox   = $false
+    $dlg.MinimizeBox   = $false
+    $dlg.Font          = $script:F.UI
+
+    $pnlAccent         = New-Object System.Windows.Forms.Panel
+    $pnlAccent.Dock    = 'Top'
+    $pnlAccent.Height  = 5
+    $pnlAccent.BackColor = $script:C.AccentBlue
+
+    $lblName           = New-Object System.Windows.Forms.Label
+    $lblName.Text      = 'ADDetector v1.0'
+    $lblName.Font      = New-Object System.Drawing.Font('Segoe UI Semibold', 16, [System.Drawing.FontStyle]::Bold)
+    $lblName.ForeColor = $script:C.AccentBlue
+    $lblName.AutoSize  = $true
+    $lblName.Location  = New-Object System.Drawing.Point(24, 24)
+
+    $lblTagline        = New-Object System.Windows.Forms.Label
+    $lblTagline.Text   = 'IAM Hygiene & Dormant Account Detection'
+    $lblTagline.Font   = $script:F.UISm
+    $lblTagline.ForeColor = $script:C.FgSecondary
+    $lblTagline.AutoSize  = $true
+    $lblTagline.Location  = New-Object System.Drawing.Point(24, 58)
+
+    $sep               = New-Object System.Windows.Forms.Panel
+    $sep.Location      = New-Object System.Drawing.Point(24, 82)
+    $sep.Size          = New-Object System.Drawing.Size(368, 1)
+    $sep.BackColor     = $script:C.Border
+
+    $lblDev            = New-Object System.Windows.Forms.Label
+    $lblDev.Text       = 'Developed by  MA Cyber Security Team'
+    $lblDev.Font       = New-Object System.Drawing.Font('Segoe UI Semibold', 9.5, [System.Drawing.FontStyle]::Bold)
+    $lblDev.ForeColor  = $script:C.FgPrimary
+    $lblDev.AutoSize   = $true
+    $lblDev.Location   = New-Object System.Drawing.Point(24, 98)
+
+    $lblDetails        = New-Object System.Windows.Forms.Label
+    $lblDetails.Text   = "Purpose  :  AD dormant / orphan account detection`nTarget    :  SOC / IAM Security Operations`nPlatform  :  PowerShell 5.1 + RSAT (Windows)`nLicense   :  Internal use only - MA Cyber"
+    $lblDetails.Font   = $script:F.UISm
+    $lblDetails.ForeColor = $script:C.FgSecondary
+    $lblDetails.AutoSize  = $true
+    $lblDetails.Location  = New-Object System.Drawing.Point(24, 126)
+
+    $sep2              = New-Object System.Windows.Forms.Panel
+    $sep2.Location     = New-Object System.Drawing.Point(24, 210)
+    $sep2.Size         = New-Object System.Drawing.Size(368, 1)
+    $sep2.BackColor    = $script:C.Border
+
+    $lblCopy           = New-Object System.Windows.Forms.Label
+    $lblCopy.Text      = [char]0x00A9 + " 2026 MA Cyber Security Team. All rights reserved."
+    $lblCopy.Font      = New-Object System.Drawing.Font('Segoe UI', 7.5)
+    $lblCopy.ForeColor = $script:C.FgMuted
+    $lblCopy.AutoSize  = $true
+    $lblCopy.Location  = New-Object System.Drawing.Point(24, 220)
+
+    $btnClose          = New-Object System.Windows.Forms.Button
+    $btnClose.Text     = 'Close'
+    $btnClose.Size     = New-Object System.Drawing.Size(80, 26)
+    $btnClose.Location = New-Object System.Drawing.Point(316, 242)
+    $btnClose.FlatStyle = 'Flat'
+    $btnClose.BackColor = $script:C.BgCard
+    $btnClose.ForeColor = $script:C.FgPrimary
+    $btnClose.FlatAppearance.BorderColor = $script:C.Border
+    $btnClose.DialogResult = [System.Windows.Forms.DialogResult]::OK
+
+    $dlg.Controls.AddRange(@($pnlAccent,$lblName,$lblTagline,$sep,$lblDev,$lblDetails,$sep2,$lblCopy,$btnClose))
+    $dlg.AcceptButton = $btnClose
+    [void]$dlg.ShowDialog($form)
+    $dlg.Dispose()
+}
+
+# ====================================================================
 # EVENTS
 # ====================================================================
+$btnAbout.Add_Click({ Show-AboutDialog })
+
 $btnDiscover.Add_Click({
     $btnDiscover.Enabled = $false
     $btnScan.Enabled     = $false
@@ -1645,6 +1891,15 @@ $btnScan.Add_Click({
 
         # Deterministik render: card filter state'i temizle, filtreleri default'a al.
         $script:ActiveCardFilter = $null
+        $script:TypeFilter = @()
+        $script:DeptFilter = @()
+        Update-MultiBtn $script:TypeDD 'Type'
+        Update-MultiBtn $script:DeptDD 'Dept'
+        # Dept dropdown'u scan sonrasi doldur
+        Populate-DeptDropdown
+        # CheckedListBox secimleri temizle
+        for ($i = 0; $i -lt $script:TypeDD.Clb.Items.Count; $i++) { $script:TypeDD.Clb.SetItemChecked($i, $false) }
+        for ($i = 0; $i -lt $script:DeptDD.Clb.Items.Count; $i++) { $script:DeptDD.Clb.SetItemChecked($i, $false) }
         try { Update-CardHighlight } catch { }
 
         $script:filteredRows = $script:allRows
@@ -1654,6 +1909,9 @@ $btnScan.Add_Click({
         $btnXLSX.Enabled = $true
         Set-Status "[$sel]  Stale: $($script:allRows.Count)  |  Critical: $($script:metricLabels['Critical'].Text)  |  Privileged: $($script:metricLabels['Privileged'].Text)  |  Never Logon: $($script:metricLabels['NeverLogon'].Text)  |  Total: $total"
         Write-AppLog -Component 'Scan' -Message "Scan complete | domain=$sel | total=$total | stale=$($script:allRows.Count)"
+        $btnScan.BackColor = [System.Drawing.Color]::FromArgb(0, 155, 70)  # green = fresh
+        $btnScan.Text      = 'SCAN'
+        $statusLabel.ForeColor = $script:C.FgSecondary
 
         # Force tek seferlik repaint - UI/backend state sync garantisi
         try {
@@ -1676,9 +1934,30 @@ $btnScan.Add_Click({
 $grid.Add_SelectionChanged({
     if ($grid.SelectedRows.Count -gt 0 -and $grid.SelectedRows[0].Tag) {
         Show-Detail $grid.SelectedRows[0].Tag
-        # If detail panel is collapsed, leave it - user toggles manually.
     }
 })
+
+# Fix: tek sonucta tiklama sorunu — CellClick her zaman tetiklenir,
+# SelectionChanged bazen tek-satirda calismiyor
+$grid.Add_CellClick({
+    param($sender, $e)
+    if ($e.RowIndex -ge 0 -and $e.RowIndex -lt $grid.Rows.Count) {
+        $row = $grid.Rows[$e.RowIndex]
+        if ($row.Tag) { Show-Detail $row.Tag }
+    }
+})
+
+# Update-Grid'den sonra tek satir varsa otomatik sec
+function Select-FirstRowIfSingle {
+    if ($grid.Rows.Count -eq 1) {
+        try {
+            $grid.ClearSelection()
+            $grid.Rows[0].Selected = $true
+            $grid.CurrentCell = $grid.Rows[0].Cells[0]
+            if ($grid.Rows[0].Tag) { Show-Detail $grid.Rows[0].Tag }
+        } catch { }
+    }
+}
 
 # Custom sort: RiskLevel kolonu Get-RiskOrder ile siralanir (alfabetik DEGIL).
 # Global sira: CRITICAL > HIGH > MEDIUM > LOW > SVC-ACCT > DISABLED
@@ -1787,12 +2066,43 @@ $cboRisk.Add_SelectedIndexChanged({
         Apply-Filters
     }
 })
-$chkPrivOnly.Add_CheckedChanged({  if ($script:allRows.Count) { if ($script:ActiveCardFilter) { $script:ActiveCardFilter = $null; Update-CardHighlight } ; Apply-Filters } })
-$chkNeverOnly.Add_CheckedChanged({ if ($script:allRows.Count) { if ($script:ActiveCardFilter) { $script:ActiveCardFilter = $null; Update-CardHighlight } ; Apply-Filters } })
-$chkHideSA.Add_CheckedChanged({    if ($script:allRows.Count) { if ($script:ActiveCardFilter) { $script:ActiveCardFilter = $null; Update-CardHighlight } ; Apply-Filters } })
-$chkHideDis.Add_CheckedChanged({   if ($script:allRows.Count) { if ($script:ActiveCardFilter) { $script:ActiveCardFilter = $null; Update-CardHighlight } ; Apply-Filters } })
-$chkVPNOnly.Add_CheckedChanged({   if ($script:allRows.Count) { if ($script:ActiveCardFilter) { $script:ActiveCardFilter = $null; Update-CardHighlight } ; Apply-Filters } })
-$chkRAOnly.Add_CheckedChanged({    if ($script:allRows.Count) { if ($script:ActiveCardFilter) { $script:ActiveCardFilter = $null; Update-CardHighlight } ; Apply-Filters } })
+
+# Threshold degisince scan butonu flash + kalici kirmizi + belirgin status
+$script:ThresholdFlashTimer = $null
+function Start-ScanFlash {
+    if (-not $script:allRows -or $script:allRows.Count -eq 0) { return }
+    $btnScan.BackColor = [System.Drawing.Color]::FromArgb(220, 50, 50)
+    $btnScan.Text      = '! SCAN !'
+    $statusLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 180, 0)
+    Set-Status "⚠  Threshold changed — press SCAN to refresh results."
+    # Flash: kirmizi <-> amber 3 kez
+    if ($script:ThresholdFlashTimer) { try { $script:ThresholdFlashTimer.Stop(); $script:ThresholdFlashTimer.Dispose() } catch { } }
+    $script:FlashCount = 0
+    $script:ThresholdFlashTimer = New-Object System.Windows.Forms.Timer
+    $script:ThresholdFlashTimer.Interval = 300
+    $script:ThresholdFlashTimer.Add_Tick({
+        $script:FlashCount++
+        if ($script:FlashCount % 2 -eq 0) {
+            $btnScan.BackColor = [System.Drawing.Color]::FromArgb(220, 50, 50)
+        } else {
+            $btnScan.BackColor = [System.Drawing.Color]::FromArgb(200, 140, 0)
+        }
+        if ($script:FlashCount -ge 6) {
+            $script:ThresholdFlashTimer.Stop()
+            $btnScan.BackColor = [System.Drawing.Color]::FromArgb(220, 50, 50)  # kirmizi kal
+        }
+    })
+    $script:ThresholdFlashTimer.Start()
+}
+
+$cboThreshold.Add_SelectedIndexChanged({ Start-ScanFlash })
+$cboThreshold.Add_TextChanged({          Start-ScanFlash })
+$chkPrivOnly.Add_CheckedChanged({  if ($script:allRows.Count) { Apply-Filters } })
+$chkNeverOnly.Add_CheckedChanged({ if ($script:allRows.Count) { Apply-Filters } })
+$chkHideSA.Add_CheckedChanged({    if ($script:allRows.Count) { Apply-Filters } })
+$chkHideDis.Add_CheckedChanged({   if ($script:allRows.Count) { Apply-Filters } })
+$chkVPNOnly.Add_CheckedChanged({   if ($script:allRows.Count) { Apply-Filters } })
+$chkRAOnly.Add_CheckedChanged({    if ($script:allRows.Count) { Apply-Filters } })
 $txtSearch.Add_TextChanged({       if ($script:allRows.Count) { Apply-Filters } })
 
 $btnClear.Add_Click({
@@ -1872,32 +2182,40 @@ function Set-SafeSplitter {
 $form.Add_Load({  Set-SafeSplitter })
 $form.Add_Shown({
     Set-SafeSplitter
-    # Auto-start sadece BIR KEZ - Add_Shown tekrar tetiklenirse atla
     if ($script:AutoStartDone) { return }
     $script:AutoStartDone = $true
 
-    # AUTO-DISCOVER -> AUTO-SCAN (deterministic, senkron)
-    # PerformClick senkron: Discover handler tamamen biter, $script:domains dolar,
-    # SONRA bu satirlar calisir. Timer/race YOK.
     try {
         Write-AppLog -Component 'AutoStart' -Message 'Auto-discover triggered'
         $btnDiscover.PerformClick()
-
-        # Discover bitti. Domain durumunu kontrol et.
-        if ($script:domains -and $script:domains.Count -eq 1) {
-            Write-AppLog -Component 'AutoStart' -Message 'Single domain -> auto-scan'
-            Set-Status 'Single domain detected. Auto-scanning...' $true
-            if ($cboDomain.Items.Count -gt 0 -and $cboDomain.SelectedIndex -lt 0) {
-                $cboDomain.SelectedIndex = 0
-            }
-            [System.Windows.Forms.Application]::DoEvents()
-            $btnScan.PerformClick()
-        } elseif ($script:domains -and $script:domains.Count -gt 1) {
-            Set-Status "Multiple domains found ($($script:domains.Count)). Select one and press SCAN."
-        }
     } catch {
-        Write-AppLog -Level WARN -Component 'AutoStart' -Message "Auto-start failed: $($_ | Out-String)"
+        Write-AppLog -Level WARN -Component 'AutoStart' -Message "Auto-discover failed: $($_ | Out-String)"
     }
+
+    # Timer-based deferred auto-scan: Discover tamamlandiktan sonra
+    # message pump'un settle etmesini bekle (100ms), sonra scan karar ver.
+    # PerformClick+DoEvents race'ini ortadan kaldirir.
+    $script:AutoScanTimer = New-Object System.Windows.Forms.Timer
+    $script:AutoScanTimer.Interval = 120
+    $script:AutoScanTimer.Add_Tick({
+        $script:AutoScanTimer.Stop()
+        $script:AutoScanTimer.Dispose()
+        try {
+            if ($script:domains -and @($script:domains).Count -ge 1) {
+                # Her zaman ilk domain'i sec ve auto-scan yap
+                # DomainDiscovery current domain'i zaten ilk siraya koyuyor
+                if ($cboDomain.Items.Count -gt 0) {
+                    $cboDomain.SelectedIndex = 0
+                }
+                Write-AppLog -Component 'AutoStart' -Message "Auto-scan -> $($cboDomain.SelectedItem)"
+                Set-Status "Auto-scanning: $($cboDomain.SelectedItem)..." $true
+                $btnScan.PerformClick()
+            }
+        } catch {
+            Write-AppLog -Level WARN -Component 'AutoStart' -Message "Auto-scan failed: $($_ | Out-String)"
+        }
+    })
+    $script:AutoScanTimer.Start()
 })
 $form.Add_Resize({
     try {

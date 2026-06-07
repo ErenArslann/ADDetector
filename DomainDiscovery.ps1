@@ -258,15 +258,58 @@ function Test-DCReachability {
     return $reachable.ToArray()
 }
 
+# ── Trust Discovery ──────────────────────────────────────────────────────────
+
+function Get-TrustedDomains {
+    [CmdletBinding()]
+    param()
+
+    $results = New-Object System.Collections.Generic.List[PSObject]
+
+    try {
+        Write-DDLog 'INFO' 'Trust discovery baslatiliyor (nltest)...'
+
+        $currentDomain = ''
+        try { $currentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().Name } catch { }
+
+        $nltestOutput = nltest /domain_trusts 2>&1
+
+        foreach ($line in $nltestOutput) {
+            if ($line -match '^\s+\d+:\s+(\S+)\s+(\S+\.\S+)\s+\(') {
+                $netbios = $Matches[1]
+                $fqdn    = $Matches[2]
+
+                if ($fqdn -eq $currentDomain) { continue }
+
+                Write-DDLog 'INFO' "Trust bulundu: $fqdn ($netbios)"
+
+                try {
+                    $info = Get-ManualDomainInfo -DomainFQDN $fqdn
+                    $info.NetBIOSName     = $netbios
+                    $info.DiscoveryMethod = 'Trust'
+                    $results.Add($info)
+                } catch {
+                    Write-DDLog 'WARN' "Trust domain bilgisi alinamadi ($fqdn): $_"
+                }
+            }
+        }
+    } catch {
+        Write-DDLog 'WARN' "Trust discovery hatasi: $_"
+    }
+
+    return $results.ToArray()
+}
+
 # ── Public Entry Point ───────────────────────────────────────────────────────
 
 function Invoke-DomainDiscovery {
     <#
     .SYNOPSIS
         GUI dropdown icin DomainInfo[] dondurur.
-        Forest -> CurrentDomain -> Manual sirasiyla dener.
+        Forest -> Trust -> CurrentDomain sirasiyla dener.
+        Siralama: current domain en basta, gerisi alfabetik.
     .PARAMETER ManualDomain
-        Belirtilirse forest discovery atlanir.
+        Belirtilirse discovery atlanir.
     #>
     [CmdletBinding()]
     param([string]$ManualDomain = '')
@@ -275,21 +318,52 @@ function Invoke-DomainDiscovery {
         return @(Get-ManualDomainInfo -DomainFQDN $ManualDomain)
     }
 
+    $allDomains = New-Object System.Collections.Generic.List[PSObject]
+
+    # 1. Forest
     try {
         $domains = Get-ForestDomains
-        if ($domains -and $domains.Count -gt 0) { return $domains }
+        if ($domains) { foreach ($d in $domains) { $allDomains.Add($d) } }
     } catch {
-        Write-DDLog 'WARN' "Forest discovery basarisiz, fallback: $_"
+        Write-DDLog 'WARN' "Forest discovery basarisiz: $_"
     }
 
+    # 2. Trust'li domain'ler
     try {
-        $cur = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-        Write-DDLog 'INFO' "CurrentDomain fallback: $($cur.Name)"
-        return @(Get-ManualDomainInfo -DomainFQDN $cur.Name)
+        $trusted = Get-TrustedDomains
+        if ($trusted) {
+            foreach ($t in $trusted) {
+                $exists = $allDomains | Where-Object { $_.DomainName -eq $t.DomainName }
+                if (-not $exists) { $allDomains.Add($t) }
+            }
+        }
     } catch {
-        Write-DDLog 'ERROR' "CurrentDomain alinamadi: $_"
-        return @()
+        Write-DDLog 'WARN' "Trust discovery basarisiz: $_"
     }
+
+    # 3. Fallback
+    if ($allDomains.Count -eq 0) {
+        try {
+            $cur = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+            Write-DDLog 'INFO' "CurrentDomain fallback: $($cur.Name)"
+            $allDomains.Add((Get-ManualDomainInfo -DomainFQDN $cur.Name))
+        } catch {
+            Write-DDLog 'ERROR' "CurrentDomain alinamadi: $_"
+            return @()
+        }
+    }
+
+    # Siralama: current machine'in join oldugu domain EN BASTA,
+    # gerisi alfabetik. Boylece motorasin.com her zaman ilk gelir.
+    $currentDomain = ''
+    try { $currentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().Name } catch { }
+
+    $sorted = $allDomains.ToArray() | Sort-Object {
+        if ($_.DomainName -eq $currentDomain) { '000' } else { $_.DomainName }
+    }
+
+    Write-DDLog 'INFO' "Discovery tamamlandi | toplam=$($sorted.Count) | ilk=$($sorted[0].DomainName)"
+    return $sorted
 }
 
 # ── Entrypoint: script dogrudan calistirilinca burasi execute edilir ─────────
@@ -300,6 +374,7 @@ Write-Host "`n=== DomainDiscovery - Test Modu ===" -ForegroundColor Green
 Write-Host "Mevcut fonksiyonlar:" -ForegroundColor Gray
 Write-Host "  Invoke-DomainDiscovery  [ana entrypoint]"
 Write-Host "  Get-ForestDomains       [forest enumeration]"
+Write-Host "  Get-TrustedDomains      [trust discovery - nltest]"
 Write-Host "  Get-ManualDomainInfo    [manuel domain entry]"
 Write-Host "  Test-DCReachability     [DC port testi]"
 Write-Host "  Get-NetBIOSName         [NetBIOS resolution]"

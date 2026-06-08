@@ -354,7 +354,7 @@ function Invoke-DomainDiscovery {
     }
 
     # Siralama: current machine'in join oldugu domain EN BASTA,
-    # gerisi alfabetik. Boylece motorasin.com her zaman ilk gelir.
+    # gerisi alfabetik. Current domain her zaman ilk sirada gelir.
     $currentDomain = ''
     try { $currentDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().Name } catch { }
 

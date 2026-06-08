@@ -24,3 +24,5 @@ desktop.ini
 # Temp
 *.tmp
 *.bak
+
+dist/

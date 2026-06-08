@@ -26,3 +26,9 @@ desktop.ini
 *.bak
 
 dist/
+
+yedek/
+logs/
+exports/
+Ana ikon 256x256.png
+Küçük ikon 32x32.png

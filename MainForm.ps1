@@ -653,10 +653,10 @@ function New-Chk {
     return $c
 }
 
-$chkPrivOnly  = New-Chk 'Priv only'      152
-$chkNeverOnly = New-Chk 'Never login'    272
-$chkHideSA    = New-Chk 'Hide svc'       388
-$chkHideDis   = New-Chk 'Hide dis'       496
+$chkPrivOnly  = New-Chk 'Privileged only' 152
+$chkNeverOnly = New-Chk 'Never logged in' 272
+$chkHideSA    = New-Chk 'Hide svc accts'  388
+$chkHideDis   = New-Chk 'Hide disabled'   496
 # VPN/MFA/Remote dropdown filters (replaces checkboxes)
 $script:VPNFilter    = 'All'   # All / Yes / No
 $script:MFAFilter    = 'All'

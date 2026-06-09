@@ -576,8 +576,9 @@ function Invoke-CardFilter {
     $chkNeverOnly.Checked    = $false
     $chkHideSA.Checked       = $false
     $chkHideDis.Checked      = $false
-    $chkVPNOnly.Checked      = $false
-    $chkRAOnly.Checked       = $false
+    $script:VPNFilter = 'All'; $btnVPNFilter.Text = 'VPN: All'; $btnVPNFilter.Tag = 'All'; $btnVPNFilter.BackColor = $script:C.BgCard
+    $script:MFAFilter = 'All'; $btnMFAFilter.Text = 'MFA: All'; $btnMFAFilter.Tag = 'All'; $btnMFAFilter.BackColor = $script:C.BgCard
+    $script:RemoteFilter = 'All'; $btnRemoteFilter.Text = 'Remote: All'; $btnRemoteFilter.Tag = 'All'; $btnRemoteFilter.BackColor = $script:C.BgCard
     # Multi-select dropdown'ları da temizle
     $script:TypeFilter = @(); Update-MultiBtn $script:TypeDD 'Type'
     $script:DeptFilter = @(); Update-MultiBtn $script:DeptDD 'Dept'
@@ -652,12 +653,34 @@ function New-Chk {
     return $c
 }
 
-$chkPrivOnly  = New-Chk 'Privileged only'    152
-$chkNeverOnly = New-Chk 'Never logged in'    280
-$chkHideSA    = New-Chk 'Hide svc accts'     408
-$chkHideDis   = New-Chk 'Hide disabled'      533
-$chkVPNOnly   = New-Chk 'VPN/MFA only'       650
-$chkRAOnly    = New-Chk 'Remote access only' 750
+$chkPrivOnly  = New-Chk 'Priv only'      152
+$chkNeverOnly = New-Chk 'Never login'    272
+$chkHideSA    = New-Chk 'Hide svc'       388
+$chkHideDis   = New-Chk 'Hide dis'       496
+# VPN/MFA/Remote dropdown filters (replaces checkboxes)
+$script:VPNFilter    = 'All'   # All / Yes / No
+$script:MFAFilter    = 'All'
+$script:RemoteFilter = 'All'
+
+function New-TriStateBtn {
+    param([string]$Label, [int]$X)
+    $btn = New-Object System.Windows.Forms.Button
+    $btn.Text     = "${Label}: All"
+    $btn.Location = New-Object System.Drawing.Point($X, 7)
+    $btn.Size     = New-Object System.Drawing.Size(90, 22)
+    $btn.FlatStyle = 'Flat'
+    $btn.BackColor = $C.BgCard
+    $btn.ForeColor = $C.FgSecondary
+    $btn.Font      = $F.UISm
+    $btn.FlatAppearance.BorderSize  = 1
+    $btn.FlatAppearance.BorderColor = $C.Border
+    $btn.Tag = 'All'
+    return $btn
+}
+
+$btnVPNFilter    = New-TriStateBtn 'VPN'    600
+$btnMFAFilter    = New-TriStateBtn 'MFA'    692
+$btnRemoteFilter = New-TriStateBtn 'Remote' 784
 
 $lblSrch      = New-Object System.Windows.Forms.Label
 $lblSrch.Text = ''
@@ -666,8 +689,8 @@ $lblSrch.Location  = New-Object System.Drawing.Point(-100, -100)
 $lblSrch.Visible = $false
 
 $txtSearch         = New-Object System.Windows.Forms.TextBox
-$txtSearch.Location = New-Object System.Drawing.Point(1110, 7)
-$txtSearch.Size     = New-Object System.Drawing.Size(220, 22)
+$txtSearch.Location = New-Object System.Drawing.Point(1108, 7)
+$txtSearch.Size     = New-Object System.Drawing.Size(210, 22)
 $txtSearch.BackColor = $C.BgCard
 $txtSearch.ForeColor = $C.FgMuted
 $txtSearch.BorderStyle = 'FixedSingle'
@@ -692,7 +715,7 @@ $txtSearch.Add_LostFocus({
 $btnDetail        = New-Object System.Windows.Forms.Button
 $btnDetail.Text   = 'Details <'
 $btnDetail.Size   = New-Object System.Drawing.Size(80, 22)
-$btnDetail.Location = New-Object System.Drawing.Point(1340, 7)
+$btnDetail.Location = New-Object System.Drawing.Point(1326, 7)
 $btnDetail.FlatStyle = 'Flat'
 $btnDetail.BackColor = $C.BgCard
 $btnDetail.ForeColor = $C.FgSecondary
@@ -700,7 +723,7 @@ $btnDetail.Font   = $F.UISm
 $btnDetail.FlatAppearance.BorderSize = 1
 $btnDetail.FlatAppearance.BorderColor = $C.Border
 
-$filterBar.Controls.AddRange(@($cboRisk,$chkPrivOnly,$chkNeverOnly,$chkHideSA,$chkHideDis,$chkVPNOnly,$chkRAOnly,$lblSrch,$txtSearch,$btnDetail))
+$filterBar.Controls.AddRange(@($cboRisk,$chkPrivOnly,$chkNeverOnly,$chkHideSA,$chkHideDis,$btnVPNFilter,$btnMFAFilter,$btnRemoteFilter,$lblSrch,$txtSearch,$btnDetail))
 
 # ── Multi-select dropdown: Type ve Department ─────────────────────────────────
 # Floating panel (Toplevel=false, form'a eklenir, filterBar'a degil)
@@ -745,8 +768,8 @@ function New-MultiDropdown {
     return @{ Btn=$btn; Popup=$popup; Clb=$clb }
 }
 
-$script:TypeDD = New-MultiDropdown 'Type' 870
-$script:DeptDD = New-MultiDropdown 'Dept' 988
+$script:TypeDD = New-MultiDropdown 'Type' 880
+$script:DeptDD = New-MultiDropdown 'Dept' 992
 
 # Popup'ları form'a ekle (filterBar'a değil — z-order için)
 $form.Controls.Add($script:TypeDD.Popup)
@@ -1276,8 +1299,12 @@ function Apply-Filters {
         if ($chkNeverOnly.Checked -and -not $r.NeverLoggedIn)    { return $false }
         if ($chkHideSA.Checked    -and $r.IsServiceAccount)      { return $false }
         if ($chkHideDis.Checked   -and -not $r.Enabled)          { return $false }
-        if ($chkVPNOnly.Checked   -and -not ($r.HasVPNAccess -or $r.HasMFA)) { return $false }
-        if ($chkRAOnly.Checked    -and -not $r.HasRemoteAccess)  { return $false }
+        if ($script:VPNFilter    -eq 'Yes' -and -not $r.HasVPNAccess)    { return $false }
+        if ($script:VPNFilter    -eq 'No'  -and $r.HasVPNAccess)         { return $false }
+        if ($script:MFAFilter    -eq 'Yes' -and -not $r.HasMFA)          { return $false }
+        if ($script:MFAFilter    -eq 'No'  -and $r.HasMFA)               { return $false }
+        if ($script:RemoteFilter -eq 'Yes' -and -not $r.HasRemoteAccess) { return $false }
+        if ($script:RemoteFilter -eq 'No'  -and $r.HasRemoteAccess)      { return $false }
         if ($srch) {
             $hay = "$($r.SamAccountName) $($r.DisplayName) $($r.Department) $($r.Mail) $($r.DistinguishedName)".ToLower()
             if ($hay -notlike "*$srch*") { return $false }
@@ -1783,7 +1810,7 @@ function Show-AboutDialog {
     $lblName.Location    = New-Object System.Drawing.Point(178, 14)
 
     $lblTagline          = New-Object System.Windows.Forms.Label
-    $lblTagline.Text     = 'Active Directory Security Assessment & Exposure Visibility'
+    $lblTagline.Text     = 'Active Directory Security Assessment && Exposure Visibility'
     $lblTagline.Font     = New-Object System.Drawing.Font('Segoe UI', 8, [System.Drawing.FontStyle]::Italic)
     $lblTagline.ForeColor = [System.Drawing.Color]::FromArgb(100, 140, 200)
     $lblTagline.AutoSize = $true
@@ -1800,7 +1827,7 @@ function Show-AboutDialog {
         @{ L = 'Platform';  V = 'PowerShell 5.1 + RSAT (Windows)';   C = $script:C.FgSecondary }
         @{ L = 'License';   V = 'Proprietary';                       C = $script:C.FgSecondary }
         @{ L = 'GitHub';    V = 'github.com/ErenArslann/ADDetector';  C = $script:C.AccentBlue  }
-        @{ L = 'LinkedIn';  V = 'linkedin.com/in/erenarslan';         C = [System.Drawing.Color]::FromArgb(0, 160, 220) }
+
     )
 
     $y = 98
@@ -1851,6 +1878,17 @@ function Show-AboutDialog {
         $dlg.Controls.Add($lc)
         $cy += 18
     }
+
+    # LinkedIn clickable link
+    $lblLinkedIn         = New-Object System.Windows.Forms.Label
+    $lblLinkedIn.Text    = 'LinkedIn  ↗'
+    $lblLinkedIn.Font    = New-Object System.Drawing.Font('Segoe UI', 8.5, [System.Drawing.FontStyle]::Underline)
+    $lblLinkedIn.ForeColor = [System.Drawing.Color]::FromArgb(0, 160, 220)
+    $lblLinkedIn.AutoSize  = $true
+    $lblLinkedIn.Location  = New-Object System.Drawing.Point(178, ($cy + 4))
+    $lblLinkedIn.Cursor    = [System.Windows.Forms.Cursors]::Hand
+    $lblLinkedIn.Add_Click({ Start-Process 'https://www.linkedin.com/in/erenarslan0/' })
+    $dlg.Controls.Add($lblLinkedIn)
 
     $btnClose            = New-Object System.Windows.Forms.Button
     $btnClose.Text       = 'Close'
@@ -2194,8 +2232,22 @@ $chkPrivOnly.Add_CheckedChanged({  if ($script:allRows.Count) { Apply-Filters } 
 $chkNeverOnly.Add_CheckedChanged({ if ($script:allRows.Count) { Apply-Filters } })
 $chkHideSA.Add_CheckedChanged({    if ($script:allRows.Count) { Apply-Filters } })
 $chkHideDis.Add_CheckedChanged({   if ($script:allRows.Count) { Apply-Filters } })
-$chkVPNOnly.Add_CheckedChanged({   if ($script:allRows.Count) { Apply-Filters } })
-$chkRAOnly.Add_CheckedChanged({    if ($script:allRows.Count) { Apply-Filters } })
+function Set-TriState {
+    param($btn, [string]$VarName, [string]$Label)
+    $states = @('All','Yes','No')
+    $colors = @{ 'All'=[System.Drawing.Color]::FromArgb(60,65,90); 'Yes'=[System.Drawing.Color]::FromArgb(20,80,40); 'No'=[System.Drawing.Color]::FromArgb(80,20,20) }
+    $cur = $btn.Tag
+    $next = $states[($states.IndexOf($cur) + 1) % 3]
+    $btn.Tag = $next
+    $btn.Text = "${Label}: $next"
+    $btn.BackColor = $colors[$next]
+    Set-Variable -Name $VarName -Value $next -Scope Script
+    if ($script:allRows.Count) { Apply-Filters }
+}
+
+$btnVPNFilter.Add_Click({    Set-TriState $btnVPNFilter    'VPNFilter'    'VPN'    })
+$btnMFAFilter.Add_Click({    Set-TriState $btnMFAFilter    'MFAFilter'    'MFA'    })
+$btnRemoteFilter.Add_Click({ Set-TriState $btnRemoteFilter 'RemoteFilter' 'Remote' })
 $txtSearch.Add_TextChanged({       if ($script:allRows.Count) { Apply-Filters } })
 
 $btnClear.Add_Click({

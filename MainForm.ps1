@@ -666,8 +666,8 @@ $lblSrch.Location  = New-Object System.Drawing.Point(-100, -100)
 $lblSrch.Visible = $false
 
 $txtSearch         = New-Object System.Windows.Forms.TextBox
-$txtSearch.Location = New-Object System.Drawing.Point(880, 7)
-$txtSearch.Size     = New-Object System.Drawing.Size(282, 22)
+$txtSearch.Location = New-Object System.Drawing.Point(1110, 7)
+$txtSearch.Size     = New-Object System.Drawing.Size(220, 22)
 $txtSearch.BackColor = $C.BgCard
 $txtSearch.ForeColor = $C.FgMuted
 $txtSearch.BorderStyle = 'FixedSingle'
@@ -692,7 +692,7 @@ $txtSearch.Add_LostFocus({
 $btnDetail        = New-Object System.Windows.Forms.Button
 $btnDetail.Text   = 'Details <'
 $btnDetail.Size   = New-Object System.Drawing.Size(80, 22)
-$btnDetail.Location = New-Object System.Drawing.Point(1175, 7)
+$btnDetail.Location = New-Object System.Drawing.Point(1340, 7)
 $btnDetail.FlatStyle = 'Flat'
 $btnDetail.BackColor = $C.BgCard
 $btnDetail.ForeColor = $C.FgSecondary
@@ -745,8 +745,8 @@ function New-MultiDropdown {
     return @{ Btn=$btn; Popup=$popup; Clb=$clb }
 }
 
-$script:TypeDD = New-MultiDropdown 'Type' 860
-$script:DeptDD = New-MultiDropdown 'Dept' 975
+$script:TypeDD = New-MultiDropdown 'Type' 870
+$script:DeptDD = New-MultiDropdown 'Dept' 988
 
 # Popup'ları form'a ekle (filterBar'a değil — z-order için)
 $form.Controls.Add($script:TypeDD.Popup)
@@ -799,27 +799,37 @@ function Update-MultiBtn {
 
 # CheckedListBox change -> filter
 $script:TypeDD.Clb.Add_ItemCheck({
-    $script:TypeFilter = @()
-    # ItemCheck fires before state updates — handle via timer
-    $t = New-Object System.Windows.Forms.Timer; $t.Interval = 30
-    $t.Add_Tick({
-        $t.Stop(); $t.Dispose()
-        $script:TypeFilter = @($script:TypeDD.Clb.CheckedItems | ForEach-Object { "$_" })
-        Update-MultiBtn $script:TypeDD 'Type'
-        if ($script:allRows.Count) { Apply-Filters }
+    if ($script:TypeFilterTimer) { try { $script:TypeFilterTimer.Stop(); $script:TypeFilterTimer.Dispose() } catch { }; $script:TypeFilterTimer = $null }
+    $script:TypeFilterTimer = New-Object System.Windows.Forms.Timer
+    $script:TypeFilterTimer.Interval = 30
+    $script:TypeFilterTimer.Add_Tick({
+        $tmr = $script:TypeFilterTimer
+        if ($tmr) { try { $tmr.Stop(); $tmr.Dispose() } catch { } }
+        $script:TypeFilterTimer = $null
+        try {
+            $script:TypeFilter = @($script:TypeDD.Clb.CheckedItems | ForEach-Object { "$_" })
+            Update-MultiBtn $script:TypeDD 'Type'
+            if ($script:allRows -and $script:allRows.Count) { Apply-Filters }
+        } catch { }
     })
-    $t.Start()
+    $script:TypeFilterTimer.Start()
 })
 
 $script:DeptDD.Clb.Add_ItemCheck({
-    $t = New-Object System.Windows.Forms.Timer; $t.Interval = 30
-    $t.Add_Tick({
-        $t.Stop(); $t.Dispose()
-        $script:DeptFilter = @($script:DeptDD.Clb.CheckedItems | ForEach-Object { "$_" })
-        Update-MultiBtn $script:DeptDD 'Dept'
-        if ($script:allRows.Count) { Apply-Filters }
+    if ($script:DeptFilterTimer) { try { $script:DeptFilterTimer.Stop(); $script:DeptFilterTimer.Dispose() } catch { }; $script:DeptFilterTimer = $null }
+    $script:DeptFilterTimer = New-Object System.Windows.Forms.Timer
+    $script:DeptFilterTimer.Interval = 30
+    $script:DeptFilterTimer.Add_Tick({
+        $tmr = $script:DeptFilterTimer
+        if ($tmr) { try { $tmr.Stop(); $tmr.Dispose() } catch { } }
+        $script:DeptFilterTimer = $null
+        try {
+            $script:DeptFilter = @($script:DeptDD.Clb.CheckedItems | ForEach-Object { "$_" })
+            Update-MultiBtn $script:DeptDD 'Dept'
+            if ($script:allRows -and $script:allRows.Count) { Apply-Filters }
+        } catch { }
     })
-    $t.Start()
+    $script:DeptFilterTimer.Start()
 })
 
 # Button clicks
@@ -1785,11 +1795,12 @@ function Show-AboutDialog {
     $sep.BackColor = [System.Drawing.Color]::FromArgb(40, 50, 80)
 
     $meta = @(
-        @{ L = 'Author';   V = 'Eren Arslan';                        C = $script:C.FgPrimary   }
-        @{ L = 'Commit';   V = $commitHash;                          C = [System.Drawing.Color]::FromArgb(180,180,100) }
-        @{ L = 'Platform'; V = 'PowerShell 5.1 + RSAT (Windows)';   C = $script:C.FgSecondary }
-        @{ L = 'License';  V = 'Proprietary';                       C = $script:C.FgSecondary }
-        @{ L = 'GitHub';   V = 'github.com/ErenArslann/ADDetector'; C = $script:C.AccentBlue  }
+        @{ L = 'Author';    V = 'Eren Arslan';                        C = $script:C.FgPrimary   }
+        @{ L = 'Commit';    V = $commitHash;                          C = [System.Drawing.Color]::FromArgb(180,180,100) }
+        @{ L = 'Platform';  V = 'PowerShell 5.1 + RSAT (Windows)';   C = $script:C.FgSecondary }
+        @{ L = 'License';   V = 'Proprietary';                       C = $script:C.FgSecondary }
+        @{ L = 'GitHub';    V = 'github.com/ErenArslann/ADDetector';  C = $script:C.AccentBlue  }
+        @{ L = 'LinkedIn';  V = 'linkedin.com/in/erenarslan';         C = [System.Drawing.Color]::FromArgb(0, 160, 220) }
     )
 
     $y = 98

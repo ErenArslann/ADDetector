@@ -101,7 +101,9 @@ if (-not (Test-Path $mainForm)) {
 try {
     Write-LaunchLog 'INFO' 'Loading MainForm...'
     Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
-    . $mainForm
+    $mainFormContent = [System.IO.File]::ReadAllText($mainForm, [System.Text.Encoding]::UTF8)
+    $sb = [ScriptBlock]::Create($mainFormContent)
+    . $sb
     Write-LaunchLog 'INFO' 'MainForm exited cleanly.'
 } catch {
     Write-LaunchLog 'ERROR' "Fatal: $_"

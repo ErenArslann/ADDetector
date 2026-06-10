@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     ADDetector build script - produces portable ADDetector.exe via ps2exe.
@@ -10,7 +10,7 @@
 
 param(
     [string]$OutDir,
-    [string]$Version = '1.0.0'
+    [string]$Version = '1.1.0'
 )
 
 $ErrorActionPreference = 'Stop'

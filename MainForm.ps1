@@ -449,17 +449,19 @@ $btnScan.Enabled = $false
 $btnClear    = New-Btn 'CLEAR'    1050 ([System.Drawing.Color]::FromArgb(75,80,110)) 72
 $btnCSV      = New-Btn 'CSV'      1130 ([System.Drawing.Color]::FromArgb(90, 110, 150)) 60
 $btnXLSX     = New-Btn 'XLSX'     1198 ([System.Drawing.Color]::FromArgb(40, 130, 90))  68
-$btnHTML     = New-Btn 'HTML'     1274 ([System.Drawing.Color]::FromArgb(120, 60, 160))  60
+$btnHTML      = New-Btn 'HTML'      1274 ([System.Drawing.Color]::FromArgb(120, 60, 160))  60
+$btnSettings  = New-Btn ([char]0x2699) 1342 ([System.Drawing.Color]::FromArgb(40, 50, 80)) 28
+$btnAbout    = New-Btn ([char]0x24D8) 1378 ([System.Drawing.Color]::FromArgb(30, 40, 70)) 28
+$btnSettings.Font = New-Object System.Drawing.Font('Segoe UI', 11)
 $btnCSV.Enabled  = $false
 $btnXLSX.Enabled = $false
 $btnHTML.Enabled = $false
 
-$btnAbout    = New-Btn ([char]0x24D8) 1276 ([System.Drawing.Color]::FromArgb(30, 40, 70)) 28
 $btnAbout.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
 $btnAbout.FlatAppearance.BorderSize = 1
 $btnAbout.FlatAppearance.BorderColor = $C.Border
 
-$topBar.Controls.AddRange(@($picLogo,$lblTitle,$lblSub,$topDivider,$lblDomLbl,$cboDomain,$lblManLbl,$txtManual,$lblThrLbl,$cboThreshold,$btnDiscover,$btnScan,$btnClear,$btnCSV,$btnXLSX,$btnHTML,$btnAbout))
+$topBar.Controls.AddRange(@($picLogo,$lblTitle,$lblSub,$topDivider,$lblDomLbl,$cboDomain,$lblManLbl,$txtManual,$lblThrLbl,$cboThreshold,$btnDiscover,$btnScan,$btnClear,$btnCSV,$btnXLSX,$btnHTML,$btnSettings,$btnAbout))
 
 # ?? METRIC CARDS ?????????????????????????????????????????????????????????????
 $cardBar           = New-Object System.Windows.Forms.Panel
@@ -1850,6 +1852,419 @@ function Show-Detail {
 }
 
 # ====================================================================
+
+# GROUP PICKER DIALOG
+# ====================================================================
+function Show-GroupPickerDialog {
+    $cfg = Get-DetectionConfig
+    if (-not $cfg) {
+        [System.Windows.Forms.MessageBox]::Show('DetectionConfig not loaded.','ADDetector','OK','Error') | Out-Null
+        return
+    }
+
+    # Get DC for AD queries
+    $dc = $null
+    try {
+        $selDomain = $cboDomain.SelectedItem
+        if ($selDomain -and $script:domains) {
+            $domInfo = $script:domains | Where-Object { $_.DomainName -eq $selDomain } | Select-Object -First 1
+            if ($domInfo -and $domInfo.DomainControllers.Count -gt 0) {
+                $dc = $domInfo.DomainControllers[0]
+            }
+        }
+    } catch { }
+
+    # Working copy of config (deep clone via JSON)
+    $workCfg = ($cfg | ConvertTo-Json -Depth 6) | ConvertFrom-Json
+
+    $dlg               = New-Object System.Windows.Forms.Form
+    $dlg.Text          = 'Group Picker — Detection Configuration'
+    $dlg.Size          = New-Object System.Drawing.Size(920, 620)
+    $dlg.MinimumSize   = New-Object System.Drawing.Size(920, 620)
+    $dlg.StartPosition = 'CenterParent'
+    $dlg.BackColor     = [System.Drawing.Color]::FromArgb(13, 17, 30)
+    $dlg.ForeColor     = [System.Drawing.Color]::FromArgb(200, 208, 224)
+    $dlg.FormBorderStyle = 'Sizable'
+    $dlg.Font          = $script:F.UI
+
+    # Top accent
+    $pnlTop            = New-Object System.Windows.Forms.Panel
+    $pnlTop.Dock       = 'Top'
+    $pnlTop.Height     = 3
+    $pnlTop.BackColor  = $script:C.AccentBlue
+
+    # Left panel - category list
+    $pnlLeft           = New-Object System.Windows.Forms.Panel
+    $pnlLeft.Location  = New-Object System.Drawing.Point(0, 3)
+    $pnlLeft.Width     = 200
+    $pnlLeft.Anchor    = 'Top,Bottom,Left'
+    $pnlLeft.Height    = 577
+    $pnlLeft.BackColor = [System.Drawing.Color]::FromArgb(8, 12, 22)
+
+    $lblCatTitle       = New-Object System.Windows.Forms.Label
+    $lblCatTitle.Text  = 'CATEGORIES'
+    $lblCatTitle.Font  = New-Object System.Drawing.Font('Segoe UI', 7.5, [System.Drawing.FontStyle]::Bold)
+    $lblCatTitle.ForeColor = [System.Drawing.Color]::FromArgb(90, 110, 160)
+    $lblCatTitle.Location  = New-Object System.Drawing.Point(12, 14)
+    $lblCatTitle.AutoSize  = $true
+
+    $lstCat            = New-Object System.Windows.Forms.ListBox
+    $lstCat.Location   = New-Object System.Drawing.Point(8, 36)
+    $lstCat.Size       = New-Object System.Drawing.Size(184, 530)
+    $lstCat.BackColor  = [System.Drawing.Color]::FromArgb(8, 12, 22)
+    $lstCat.ForeColor  = [System.Drawing.Color]::FromArgb(200, 208, 224)
+    $lstCat.BorderStyle = 'None'
+    $lstCat.Font       = New-Object System.Drawing.Font('Segoe UI', 9.5)
+    $lstCat.ItemHeight = 32
+
+    $pnlLeft.Controls.AddRange(@($lblCatTitle, $lstCat))
+
+    # Separator
+    $pnlSep            = New-Object System.Windows.Forms.Panel
+    $pnlSep.Location   = New-Object System.Drawing.Point(200, 3)
+    $pnlSep.Width      = 2
+    $pnlSep.Anchor     = 'Top,Bottom,Left'
+    $pnlSep.Height     = 577
+    $pnlSep.BackColor  = [System.Drawing.Color]::FromArgb(30, 40, 70)
+
+    # Right panel
+    $pnlRight          = New-Object System.Windows.Forms.Panel
+    $pnlRight.Location = New-Object System.Drawing.Point(202, 3)
+    $pnlRight.Anchor   = 'Top,Bottom,Left,Right'
+    $pnlRight.Size     = New-Object System.Drawing.Size(700, 520)
+    $pnlRight.BackColor = [System.Drawing.Color]::FromArgb(13, 17, 30)
+
+    # Category label
+    $lblCatName        = New-Object System.Windows.Forms.Label
+    $lblCatName.Text   = 'Select a category'
+    $lblCatName.Font   = New-Object System.Drawing.Font('Segoe UI', 13, [System.Drawing.FontStyle]::Bold)
+    $lblCatName.ForeColor = $script:C.AccentBlue
+    $lblCatName.Location  = New-Object System.Drawing.Point(16, 14)
+    $lblCatName.AutoSize  = $true
+
+    # Enabled checkbox
+    $chkEnabled        = New-Object System.Windows.Forms.CheckBox
+    $chkEnabled.Text   = 'Enabled'
+    $chkEnabled.Font   = New-Object System.Drawing.Font('Segoe UI', 9)
+    $chkEnabled.ForeColor = [System.Drawing.Color]::FromArgb(200, 208, 224)
+    $chkEnabled.Location  = New-Object System.Drawing.Point(16, 48)
+    $chkEnabled.AutoSize  = $true
+    $chkEnabled.Enabled   = $false
+
+    # Regex label + box
+    $lblRegex          = New-Object System.Windows.Forms.Label
+    $lblRegex.Text     = 'Regex Pattern (fallback if no group match):'
+    $lblRegex.Font     = New-Object System.Drawing.Font('Segoe UI', 8)
+    $lblRegex.ForeColor = [System.Drawing.Color]::FromArgb(90, 110, 160)
+    $lblRegex.Location  = New-Object System.Drawing.Point(16, 78)
+    $lblRegex.AutoSize  = $true
+
+    $txtRegex          = New-Object System.Windows.Forms.TextBox
+    $txtRegex.Location = New-Object System.Drawing.Point(16, 96)
+    $txtRegex.Size     = New-Object System.Drawing.Size(660, 22)
+    $txtRegex.BackColor = [System.Drawing.Color]::FromArgb(22, 28, 48)
+    $txtRegex.ForeColor = [System.Drawing.Color]::FromArgb(200, 208, 224)
+    $txtRegex.BorderStyle = 'FixedSingle'
+    $txtRegex.Font     = New-Object System.Drawing.Font('Consolas', 8.5)
+    $txtRegex.Enabled  = $false
+
+    # Separator line
+    $sep1              = New-Object System.Windows.Forms.Panel
+    $sep1.Location     = New-Object System.Drawing.Point(16, 130)
+    $sep1.Size         = New-Object System.Drawing.Size(660, 1)
+    $sep1.BackColor    = [System.Drawing.Color]::FromArgb(30, 40, 70)
+
+    # Left sub-panel: current groups
+    $lblGroups         = New-Object System.Windows.Forms.Label
+    $lblGroups.Text    = 'SELECTED GROUPS'
+    $lblGroups.Font    = New-Object System.Drawing.Font('Segoe UI', 7.5, [System.Drawing.FontStyle]::Bold)
+    $lblGroups.ForeColor = [System.Drawing.Color]::FromArgb(90, 110, 160)
+    $lblGroups.Location  = New-Object System.Drawing.Point(16, 142)
+    $lblGroups.AutoSize  = $true
+
+    $lstGroups         = New-Object System.Windows.Forms.ListBox
+    $lstGroups.Location = New-Object System.Drawing.Point(16, 162)
+    $lstGroups.Size    = New-Object System.Drawing.Size(300, 260)
+    $lstGroups.BackColor = [System.Drawing.Color]::FromArgb(16, 21, 38)
+    $lstGroups.ForeColor = [System.Drawing.Color]::FromArgb(200, 208, 224)
+    $lstGroups.BorderStyle = 'FixedSingle'
+    $lstGroups.Font    = New-Object System.Drawing.Font('Consolas', 8.5)
+    $lstGroups.Enabled = $false
+
+    $btnRemoveGroup    = New-Object System.Windows.Forms.Button
+    $btnRemoveGroup.Text = 'Remove Selected'
+    $btnRemoveGroup.Location = New-Object System.Drawing.Point(16, 430)
+    $btnRemoveGroup.Size = New-Object System.Drawing.Size(130, 26)
+    $btnRemoveGroup.FlatStyle = 'Flat'
+    $btnRemoveGroup.BackColor = [System.Drawing.Color]::FromArgb(80, 20, 20)
+    $btnRemoveGroup.ForeColor = [System.Drawing.Color]::White
+    $btnRemoveGroup.FlatAppearance.BorderSize = 0
+    $btnRemoveGroup.Enabled = $false
+
+    # Right sub-panel: AD search
+    $lblSearch         = New-Object System.Windows.Forms.Label
+    $lblSearch.Text    = 'SEARCH AD GROUPS'
+    $lblSearch.Font    = New-Object System.Drawing.Font('Segoe UI', 7.5, [System.Drawing.FontStyle]::Bold)
+    $lblSearch.ForeColor = [System.Drawing.Color]::FromArgb(90, 110, 160)
+    $lblSearch.Location  = New-Object System.Drawing.Point(336, 142)
+    $lblSearch.AutoSize  = $true
+
+    $txtADSearch       = New-Object System.Windows.Forms.TextBox
+    $txtADSearch.Location = New-Object System.Drawing.Point(336, 162)
+    $txtADSearch.Size  = New-Object System.Drawing.Size(240, 22)
+    $txtADSearch.BackColor = [System.Drawing.Color]::FromArgb(22, 28, 48)
+    $txtADSearch.ForeColor = [System.Drawing.Color]::FromArgb(200, 208, 224)
+    $txtADSearch.BorderStyle = 'FixedSingle'
+    $txtADSearch.Enabled = $false
+
+    $btnADSearch       = New-Object System.Windows.Forms.Button
+    $btnADSearch.Text  = 'Search'
+    $btnADSearch.Location = New-Object System.Drawing.Point(584, 161)
+    $btnADSearch.Size  = New-Object System.Drawing.Size(70, 24)
+    $btnADSearch.FlatStyle = 'Flat'
+    $btnADSearch.BackColor = $script:C.AccentBlue
+    $btnADSearch.ForeColor = [System.Drawing.Color]::White
+    $btnADSearch.FlatAppearance.BorderSize = 0
+    $btnADSearch.Enabled = $false
+
+    $lblSearchStatus   = New-Object System.Windows.Forms.Label
+    $lblSearchStatus.Text = ''
+    $lblSearchStatus.Font = New-Object System.Drawing.Font('Segoe UI', 7.5)
+    $lblSearchStatus.ForeColor = [System.Drawing.Color]::FromArgb(90, 110, 160)
+    $lblSearchStatus.Location  = New-Object System.Drawing.Point(336, 188)
+    $lblSearchStatus.Size      = New-Object System.Drawing.Size(320, 16)
+
+    $lstADResults      = New-Object System.Windows.Forms.ListBox
+    $lstADResults.Location = New-Object System.Drawing.Point(336, 206)
+    $lstADResults.Size = New-Object System.Drawing.Size(320, 216)
+    $lstADResults.BackColor = [System.Drawing.Color]::FromArgb(16, 21, 38)
+    $lstADResults.ForeColor = [System.Drawing.Color]::FromArgb(200, 208, 224)
+    $lstADResults.BorderStyle = 'FixedSingle'
+    $lstADResults.Font = New-Object System.Drawing.Font('Consolas', 8.5)
+    $lstADResults.Enabled = $false
+
+    $btnAddGroup       = New-Object System.Windows.Forms.Button
+    $btnAddGroup.Text  = '← Add to Selected'
+    $btnAddGroup.Location = New-Object System.Drawing.Point(336, 430)
+    $btnAddGroup.Size  = New-Object System.Drawing.Size(130, 26)
+    $btnAddGroup.FlatStyle = 'Flat'
+    $btnAddGroup.BackColor = [System.Drawing.Color]::FromArgb(20, 80, 40)
+    $btnAddGroup.ForeColor = [System.Drawing.Color]::White
+    $btnAddGroup.FlatAppearance.BorderSize = 0
+    $btnAddGroup.Enabled = $false
+
+    $pnlRight.Controls.AddRange(@(
+        $lblCatName, $chkEnabled, $lblRegex, $txtRegex, $sep1,
+        $lblGroups, $lstGroups, $btnRemoveGroup,
+        $lblSearch, $txtADSearch, $btnADSearch, $lblSearchStatus, $lstADResults, $btnAddGroup
+    ))
+
+    # Bottom bar
+    $pnlBottom         = New-Object System.Windows.Forms.Panel
+    $pnlBottom.Dock    = 'Bottom'
+    $pnlBottom.Height  = 54
+    $pnlBottom.BackColor = [System.Drawing.Color]::FromArgb(8, 12, 22)
+
+    $btnSave           = New-Object System.Windows.Forms.Button
+    $btnSave.Text      = 'Save Changes'
+    $btnSave.Size      = New-Object System.Drawing.Size(130, 32)
+    $btnSave.Location  = New-Object System.Drawing.Point(660, 11)
+    $btnSave.FlatStyle = 'Flat'
+    $btnSave.BackColor = $script:C.AccentBlue
+    $btnSave.ForeColor = [System.Drawing.Color]::White
+    $btnSave.FlatAppearance.BorderSize = 0
+    $btnSave.Font      = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
+
+    $btnCancel         = New-Object System.Windows.Forms.Button
+    $btnCancel.Text    = 'Cancel'
+    $btnCancel.Size    = New-Object System.Drawing.Size(90, 32)
+    $btnCancel.Location = New-Object System.Drawing.Point(796, 11)
+    $btnCancel.FlatStyle = 'Flat'
+    $btnCancel.BackColor = [System.Drawing.Color]::FromArgb(40, 48, 72)
+    $btnCancel.ForeColor = [System.Drawing.Color]::White
+    $btnCancel.FlatAppearance.BorderSize = 0
+    $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+
+    $lblUnsaved        = New-Object System.Windows.Forms.Label
+    $lblUnsaved.Text   = ''
+    $lblUnsaved.Font   = New-Object System.Drawing.Font('Segoe UI', 8)
+    $lblUnsaved.ForeColor = [System.Drawing.Color]::FromArgb(180, 140, 40)
+    $lblUnsaved.Location  = New-Object System.Drawing.Point(16, 18)
+    $lblUnsaved.AutoSize  = $true
+
+    $pnlBottom.Controls.AddRange(@($btnSave, $btnCancel, $lblUnsaved))
+
+    $dlg.Controls.AddRange(@($pnlTop, $pnlLeft, $pnlSep, $pnlRight, $pnlBottom))
+    $dlg.CancelButton = $btnCancel
+
+    # --- Populate category list from config (config-driven) ---
+    $catKeys = @($workCfg.patterns.PSObject.Properties.Name)
+    foreach ($key in $catKeys) {
+        $cat = $workCfg.patterns.$key
+        $label = if ($cat.label) { $cat.label } else { $key }
+        $enabledIcon = if ($cat.isEnabled) { '[✓]' } else { '[ ]' }
+        [void]$lstCat.Items.Add("$enabledIcon  $label")
+    }
+
+    # --- Load category into right panel ---
+    $script:GPCurrentKey = $null
+    $script:GPDirty = $false
+
+    function Load-Category {
+        param([string]$Key)
+        $script:GPCurrentKey = $Key
+        $cat = $workCfg.patterns.$Key
+        $label = if ($cat.label) { $cat.label } else { $Key }
+        $lblCatName.Text   = $label
+        $chkEnabled.Checked = [bool]$cat.isEnabled
+        $chkEnabled.Enabled = $true
+        $txtRegex.Text     = if ($cat.regex) { $cat.regex } else { '' }
+        $txtRegex.Enabled  = $true
+        $lstGroups.Items.Clear()
+        if ($cat.groups -and $cat.groups.Count -gt 0) {
+            foreach ($g in $cat.groups) { [void]$lstGroups.Items.Add($g) }
+        }
+        $lstGroups.Enabled    = $true
+        $btnRemoveGroup.Enabled = $true
+        $txtADSearch.Enabled  = $true
+        $btnADSearch.Enabled  = $true
+        $lstADResults.Enabled = $true
+        $btnAddGroup.Enabled  = $true
+        $lstADResults.Items.Clear()
+        $lblSearchStatus.Text = ''
+        $txtADSearch.Text     = ''
+    }
+
+    function Refresh-CatList {
+        $sel = $lstCat.SelectedIndex
+        $lstCat.Items.Clear()
+        foreach ($key in $catKeys) {
+            $cat = $workCfg.patterns.$key
+            $label = if ($cat.label) { $cat.label } else { $key }
+            $enabledIcon = if ($cat.isEnabled) { '[✓]' } else { '[ ]' }
+            [void]$lstCat.Items.Add("$enabledIcon  $label")
+        }
+        if ($sel -ge 0 -and $sel -lt $lstCat.Items.Count) { $lstCat.SelectedIndex = $sel }
+    }
+
+    function Mark-Dirty {
+        $script:GPDirty = $true
+        $lblUnsaved.Text = '● Unsaved changes'
+    }
+
+    # --- Events ---
+    $lstCat.Add_SelectedIndexChanged({
+        $idx = $lstCat.SelectedIndex
+        if ($idx -ge 0 -and $idx -lt $catKeys.Count) {
+            Load-Category $catKeys[$idx]
+        }
+    })
+
+    $chkEnabled.Add_CheckedChanged({
+        if ($script:GPCurrentKey) {
+            $workCfg.patterns.($script:GPCurrentKey).isEnabled = $chkEnabled.Checked
+            Refresh-CatList
+            Mark-Dirty
+        }
+    })
+
+    $txtRegex.Add_TextChanged({
+        if ($script:GPCurrentKey) {
+            $workCfg.patterns.($script:GPCurrentKey).regex = $txtRegex.Text
+            Mark-Dirty
+        }
+    })
+
+    $btnRemoveGroup.Add_Click({
+        if ($lstGroups.SelectedItem -and $script:GPCurrentKey) {
+            $grp = $lstGroups.SelectedItem
+            $lstGroups.Items.Remove($grp)
+            $newGroups = @($lstGroups.Items | ForEach-Object { "$_" })
+            $workCfg.patterns.($script:GPCurrentKey).groups = $newGroups
+            Mark-Dirty
+        }
+    })
+
+    $doSearch = {
+        $query = $txtADSearch.Text.Trim()
+        if ($query.Length -lt 3) {
+            $lblSearchStatus.Text = 'Type at least 3 characters'
+            return
+        }
+        $lblSearchStatus.Text = 'Searching...'
+        $lstADResults.Items.Clear()
+        try {
+            $server = $dc
+            $filter = "Name -like '*$query*'"
+            $params = @{ Filter = $filter; Properties = @('Name') }
+            if ($server) { $params['Server'] = $server }
+            $results = Get-ADGroup @params | Select-Object -ExpandProperty Name | Sort-Object | Select-Object -First 100
+            $lstADResults.Items.Clear()
+            if ($results -and @($results).Count -gt 0) {
+                foreach ($r in @($results)) { [void]$lstADResults.Items.Add($r) }
+                $lblSearchStatus.Text = "$(@($results).Count) result(s) — max 100"
+            } else {
+                $lblSearchStatus.Text = 'No results found'
+            }
+        } catch {
+            $lblSearchStatus.Text = "Error: $_"
+        }
+    }
+
+    $btnADSearch.Add_Click($doSearch)
+    $txtADSearch.Add_KeyDown({
+        if ($_.KeyCode -eq [System.Windows.Forms.Keys]::Return) { & $doSearch }
+    })
+
+    $btnAddGroup.Add_Click({
+        if ($lstADResults.SelectedItem -and $script:GPCurrentKey) {
+            $grp = "$($lstADResults.SelectedItem)"
+            if ($lstGroups.Items -notcontains $grp) {
+                [void]$lstGroups.Items.Add($grp)
+                $newGroups = @($lstGroups.Items | ForEach-Object { "$_" })
+                $workCfg.patterns.($script:GPCurrentKey).groups = $newGroups
+                Mark-Dirty
+            }
+        }
+    })
+
+    $lstADResults.Add_DoubleClick({
+        & $btnAddGroup.Add_Click
+        $btnAddGroup.PerformClick()
+    })
+
+    $btnSave.Add_Click({
+        try {
+            # Write workCfg back to DetectionConfig
+            foreach ($key in $catKeys) {
+                $cat = $workCfg.patterns.$key
+                $groups = if ($cat.groups) { @($cat.groups | ForEach-Object { "$_" }) } else { @() }
+                Set-DetectionCategory -Category $key -Groups $groups -Regex $cat.regex -IsEnabled ([bool]$cat.isEnabled)
+            }
+            Save-DetectionConfig
+            $script:GPDirty = $false
+            $lblUnsaved.Text = '✓ Saved'
+            Write-AppLog -Component 'GroupPicker' -Message 'Detection config saved'
+            [System.Windows.Forms.MessageBox]::Show('Configuration saved successfully.','ADDetector','OK','Information') | Out-Null
+            $dlg.DialogResult = [System.Windows.Forms.DialogResult]::OK
+            $dlg.Close()
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Save failed:`n$_",'ADDetector','OK','Error') | Out-Null
+        }
+    })
+
+    $dlg.Add_FormClosing({
+        if ($script:GPDirty -and $dlg.DialogResult -ne [System.Windows.Forms.DialogResult]::OK) {
+            $r = [System.Windows.Forms.MessageBox]::Show(
+                'You have unsaved changes. Discard?','ADDetector','YesNo','Warning')
+            if ($r -ne [System.Windows.Forms.DialogResult]::Yes) { $_.Cancel = $true }
+        }
+    })
+
+    [void]$dlg.ShowDialog($form)
+    $dlg.Dispose()
+}
+
 # ABOUT DIALOG
 # ====================================================================
 function Show-AboutDialog {
@@ -2034,6 +2449,7 @@ function Show-AboutDialog {
 # ====================================================================
 # EVENTS
 # ====================================================================
+$btnSettings.Add_Click({ Show-GroupPickerDialog })
 $btnAbout.Add_Click({ Show-AboutDialog })
 
 $btnDiscover.Add_Click({

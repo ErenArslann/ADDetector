@@ -234,7 +234,7 @@ try {
 # FORM
 # ====================================================================
 $form               = New-Object System.Windows.Forms.Form
-$form.Text          = 'ADDetector v1.0'
+$form.Text          = 'ADDetector v1.1'
 $form.Size          = New-Object System.Drawing.Size(1800, 880)
 $form.MinimumSize   = New-Object System.Drawing.Size(1280, 700)
 $form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
@@ -317,7 +317,7 @@ $topBar.BackColor  = $C.BgMid
 $topBar.AutoScroll = $true   # narrow screens: horizontal scroll
 
 $lblTitle         = New-Object System.Windows.Forms.Label
-$lblTitle.Text    = 'ADDetector v1.0'
+$lblTitle.Text    = 'ADDetector v1.1'
 $lblTitle.Font    = New-Object System.Drawing.Font('Segoe UI Semibold', 13, [System.Drawing.FontStyle]::Regular)
 $lblTitle.ForeColor = $C.AccentBlue
 $lblTitle.AutoSize  = $true
@@ -1022,6 +1022,21 @@ $mainSplit.Panel2.Controls.Add($detailOuter)
 # ki Top/Bottom dock'lardan ARTAN alani alsin (yoksa Fill statusBar/topBar uzerine taspar).
 $form.Controls.Add($mainSplit)    # Fill - last to claim remaining area visually
 $form.Controls.Add($statusBar)    # Bottom
+
+# Update notification button
+$btnUpdateNotify             = New-Object System.Windows.Forms.Button
+$btnUpdateNotify.Text        = ''
+$btnUpdateNotify.Font        = New-Object System.Drawing.Font('Segoe UI', 8, [System.Drawing.FontStyle]::Bold)
+$btnUpdateNotify.ForeColor   = [System.Drawing.Color]::FromArgb(255, 210, 60)
+$btnUpdateNotify.BackColor   = [System.Drawing.Color]::FromArgb(80, 55, 0)
+$btnUpdateNotify.FlatStyle   = 'Flat'
+$btnUpdateNotify.FlatAppearance.BorderSize = 0
+$btnUpdateNotify.Dock        = 'Bottom'
+$btnUpdateNotify.Height      = 22
+$btnUpdateNotify.TextAlign   = 'MiddleCenter'
+$btnUpdateNotify.Visible     = $false
+$btnUpdateNotify.Cursor      = [System.Windows.Forms.Cursors]::Hand
+$form.Controls.Add($btnUpdateNotify)
 $form.Controls.Add($filterBar)    # Top (added last among Tops -> nearest to grid)
 $form.Controls.Add($cardBar)      # Top
 $form.Controls.Add($topBar)       # Top (added last -> topmost visually)
@@ -1444,7 +1459,7 @@ function Export-HTML-Report {
 <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Segoe UI",Arial,sans-serif;background:#0d111e;color:#c8d0e0;font-size:14px}.page{max-width:1100px;margin:0 auto;padding:32px 24px}header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #4a9eff;padding-bottom:16px;margin-bottom:28px}.brand{display:flex;align-items:center;gap:14px}.brand h1{font-size:26px;color:#fff;letter-spacing:1px}.meta{text-align:right;color:#7080a0;font-size:12px;line-height:1.8}.section{margin-bottom:32px}.section h2{font-size:15px;color:#4a9eff;text-transform:uppercase;letter-spacing:1px;border-left:4px solid #4a9eff;padding-left:10px;margin-bottom:16px}.cards{display:flex;gap:12px;flex-wrap:wrap}.card{background:#1a1f35;border-radius:8px;padding:16px 20px;min-width:130px;flex:1;border-top:3px solid}.card .num{font-size:32px;font-weight:bold;line-height:1.1}.card .lbl{font-size:11px;color:#7080a0;margin-top:4px;text-transform:uppercase}.findings,.actions,.bar-chart,.env-grid{background:#1a1f35;border-radius:8px;padding:20px}.findings li,.actions li{padding:7px 0;border-bottom:1px solid #252d45;list-style:none}.findings li:last-child,.actions li:last-child{border-bottom:none}.findings li{display:flex;align-items:center;gap:10px}.icon{font-size:18px;width:28px;text-align:center}.actions li{padding-left:20px;position:relative;color:#c8d0e0}.actions li::before{content:"→";position:absolute;left:0;color:#4a9eff}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px}.bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}.bar-label{width:80px;font-size:12px;color:#7080a0;text-align:right}.bar-track{flex:1;background:#252d45;border-radius:4px;height:24px}.bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:12px;font-weight:bold;color:#fff;min-width:32px}.bar-count{font-size:12px;color:#7080a0;width:40px}table{width:100%;border-collapse:collapse;background:#1a1f35;border-radius:8px;overflow:hidden;font-size:12px}th{background:#252d45;color:#7080a0;text-transform:uppercase;letter-spacing:.5px;font-size:11px;padding:10px 12px;text-align:left}td{padding:9px 12px;border-bottom:1px solid #252d45;vertical-align:middle}tr:last-child td{border-bottom:none}tr:hover td{background:#1f2640}.badge{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:bold;color:#fff}.yes{color:#2ecc71;font-weight:bold}.no{color:#7080a0}.env-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.env-item{display:flex;gap:8px}.env-key{color:#7080a0;min-width:120px;font-size:12px}.env-val{color:#c8d0e0;font-size:12px}footer{text-align:center;color:#3a4460;font-size:11px;margin-top:40px;padding-top:20px;border-top:1px solid #1a2035}</style>
 </head><body><div class="page">
 <header><div class="brand">$logoTag<div><h1>ADDetector</h1><div style="font-size:12px;color:#4a9eff">Executive Security Report</div></div></div>
-<div class="meta">Domain: <b style="color:#c8d0e0">$domain</b><br>Scan Date: $scanDate<br>Generated by ADDetector v1.0</div></header>
+<div class="meta">Domain: <b style="color:#c8d0e0">$domain</b><br>Scan Date: $scanDate<br>Generated by ADDetector v1.1</div></header>
 <div class="section"><h2>Environment</h2><div class="env-grid">
 <div class="env-item"><span class="env-key">Domain</span><span class="env-val">$domain</span></div>
 <div class="env-item"><span class="env-key">Total Users</span><span class="env-val">$total</span></div>
@@ -1493,7 +1508,7 @@ function Export-HTML-Report {
 <div class="section"><h2>Top 20 Critical Accounts</h2>
 <table><thead><tr><th>Risk</th><th>Username</th><th>Display Name</th><th>Type</th><th>Inactive</th><th>VPN</th><th>MFA</th><th>Score</th><th>Why Flagged</th></tr></thead>
 <tbody>$top20Rows</tbody></table></div>
-<footer>Generated by <b>ADDetector v1.0</b> &nbsp;|&nbsp; &copy; 2026 Eren Arslan &nbsp;|&nbsp; <a href="https://github.com/ErenArslann/ADDetector" style="color:#4a9eff;text-decoration:none">github.com/ErenArslann/ADDetector</a></footer>
+<footer>Generated by <b>ADDetector v1.1</b> &nbsp;|&nbsp; &copy; 2026 Eren Arslan &nbsp;|&nbsp; <a href="https://github.com/ErenArslann/ADDetector" style="color:#4a9eff;text-decoration:none">github.com/ErenArslann/ADDetector</a></footer>
 </div></body></html>
 "@
         $enc = New-Object System.Text.UTF8Encoding($false)
@@ -2318,7 +2333,7 @@ function Show-AboutDialog {
     $pnlLeft.Controls.Add($picAboutLogo)
 
     $lblLeftVer          = New-Object System.Windows.Forms.Label
-    $lblLeftVer.Text     = "v1.0`nStable"
+    $lblLeftVer.Text     = "v1.1`nStable"
     $lblLeftVer.Font     = New-Object System.Drawing.Font('Consolas', 9, [System.Drawing.FontStyle]::Bold)
     $lblLeftVer.ForeColor = $script:C.AccentBlue
     $lblLeftVer.TextAlign = 'MiddleCenter'
@@ -2867,11 +2882,49 @@ function Set-SafeSplitter {
 }
 
 # Debounced resize: many Resize events per drag, run once after settle
+$btnUpdateNotify.Add_Click({
+    Write-AppLog -Component 'Update' -Message 'Update clicked'
+    if (-not $script:LatestZipUrl) {
+        Start-Process 'https://github.com/ErenArslann/ADDetector/releases/latest'
+        return
+    }
+    try {
+        $installDir = $script:BasePath
+        $zipName    = 'ADDetector-' + $script:LatestVersion + '.zip'
+        $savePath   = Join-Path $installDir $zipName
+        Set-Status 'Guncelleme indiriliyor...' $true
+        $wc2 = New-Object System.Net.WebClient
+        $wc2.Headers.Add('User-Agent', 'ADDetector-Updater')
+        $wc2.DownloadFile($script:LatestZipUrl, $savePath)
+        $wc2.Dispose()
+        Write-AppLog -Component 'Update' -Message ('Downloaded: ' + $savePath)
+        $updaterExe = Join-Path $installDir 'Updater.exe'
+        $exePath    = Join-Path $installDir 'ADDetector.exe'
+        if (Test-Path $updaterExe) {
+            $args = '-ZipPath "' + $savePath + '" -InstallDir "' + $installDir + '" -ExePath "' + $exePath + '"'
+            Start-Process $updaterExe $args -WindowStyle Hidden
+            $form.Close()
+        } else {
+            [System.Windows.Forms.MessageBox]::Show('Guncelleme indirildi. Updater.exe bulunamadi - lutfen ZIP dosyasini klasore manuel cikartin.','ADDetector','OK','Warning') | Out-Null
+            Start-Process 'explorer.exe' $installDir
+            $form.Close()
+        }
+    } catch {
+        Write-AppLog -Level ERROR -Component 'Update' -Message ('Download failed: ' + $_)
+        Set-Status 'Indirme basarisiz'
+        Start-Process 'https://github.com/ErenArslann/ADDetector/releases/latest'
+    }
+})
+
 $form.Add_Load({  Set-SafeSplitter })
 $form.Add_Shown({
     Set-SafeSplitter
     if ($script:AutoStartDone) { return }
     $script:AutoStartDone = $true
+    if ($script:UpdateAvailable -and $script:LatestVersion) {
+        $btnUpdateNotify.Text    = [char]0x2b06 + '  ' + $script:LatestVersion + ' mevcut  -  Guncellemek icin tiklayin'
+        $btnUpdateNotify.Visible = $true
+    }
 
     try {
         Write-AppLog -Component 'AutoStart' -Message 'Auto-discover triggered'

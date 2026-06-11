@@ -101,6 +101,7 @@ Copy-Item (Join-Path $root 'MainForm.ps1')                  $OutDir -Force
 Copy-Item (Join-Path $root 'DomainDiscovery.ps1')           $OutDir -Force
 Copy-Item (Join-Path $root 'modules\DetectionConfig.ps1')   (Join-Path $OutDir 'modules') -Force
 Copy-Item (Join-Path $root 'config\detection-groups.json')  (Join-Path $OutDir 'config')  -Force
+if (Test-Path (Join-Path $root 'Updater.ps1')) { Copy-Item (Join-Path $root 'Updater.ps1') $OutDir -Force }
 Write-OK "Files copied."
 
 # ---------- 6b) Logo + ICO (soft-fail) ----------
@@ -208,6 +209,21 @@ if (-not (Test-Path $exePath)) {
     exit 1
 }
 Write-OK "EXE built: $exePath"
+
+# ---------- 7b) Compile Updater.exe ----------
+Write-Step "Compiling Updater.ps1 -> Updater.exe..."
+$updaterSrc = Join-Path $root 'Updater.ps1'
+$updaterExe = Join-Path $OutDir 'Updater.exe'
+if (Test-Path $updaterSrc) {
+    try {
+        Invoke-ps2exe -inputFile $updaterSrc -outputFile $updaterExe -noConsole -title 'ADDetector Updater' -version $Version -STA -ErrorAction Stop *>> $ps2exeLog
+        Write-OK "Updater.exe built: $updaterExe"
+    } catch {
+        Write-Warn2 "Updater.exe build failed (non-fatal): $_"
+    }
+} else {
+    Write-Warn2 "Updater.ps1 not found - skipping"
+}
 
 # ---------- 8) Zip ----------
 Write-Step "Creating distribution zip..."
